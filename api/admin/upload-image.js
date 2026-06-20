@@ -2,12 +2,30 @@
 import { put } from '@vercel/blob';
 import { cors, verifyJWT, ok, err } from '../_lib.js';
 
-export const config = {
-  api: { bodyParser: false } // we need raw stream access for the upload
-};
+// NOTE: `export const config = { api: { bodyParser: false } }` only works in Next.js API routes.
+// This project is plain Vercel Functions (no Next.js), so that directive is silently ignored.
+// We manually buffer the raw request stream instead.
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    req.on('data', (chunk) => {
+      total += chunk.length;
+      if (total > MAX_BYTES) {
+        reject(new Error('File too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
 
 export default async function handler(req, res) {
   cors(res);
@@ -27,19 +45,22 @@ export default async function handler(req, res) {
   }
 
   try {
+    const buffer = await readRawBody(req);
+
     const ext = contentType.split('/')[1];
     const filename = `events/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     // No explicit token — @vercel/blob SDK auto-detects OIDC credentials
     // (VERCEL_OIDC_TOKEN + BLOB_STORE_ID) when the store is connected via OIDC,
     // which is the default for stores connected directly within a project.
-    const blob = await put(filename, req, {
+    const blob = await put(filename, buffer, {
       access: 'public',
       contentType
     });
 
     return ok(res, { url: blob.url }, 201);
   } catch (e) {
-    return err(res, 'Nalaganje ni uspelo: ' + e.message, 500);
+    console.error('upload-image error:', e); // visible in Vercel Logs even if e.message is empty
+    return err(res, 'Nalaganje ni uspelo: ' + (e.message || 'neznana napaka'), 500);
   }
 }
