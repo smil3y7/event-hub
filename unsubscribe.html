@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Odjava — Sentria Events</title>
+<style>
+:root {
+  --bg: #0a0a12; --card: #1a1a2e; --border: rgba(120,100,255,0.18);
+  --accent: #7c6dfa; --accent2: #c4a44a;
+  --text: #e8e4ff; --text2: #9d97c8; --text3: #5e5a8a;
+  --danger: #e06060;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); }
+.wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+}
+.box {
+  width: 100%; max-width: 400px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 2.5rem 2rem; text-align: center;
+}
+.box h1 { font-size: 1.3rem; font-weight: 500; margin-bottom: 0.6rem; }
+.box p { color: var(--text2); font-size: 0.9rem; margin-bottom: 1.6rem; line-height: 1.5; }
+input {
+  width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.75rem 0.9rem; color: var(--text); font-family: var(--sans); font-size: 0.92rem; outline: none;
+  margin-bottom: 1rem; text-align: center;
+}
+input:focus { border-color: var(--accent); }
+button {
+  width: 100%; background: var(--danger); color: #fff; border: none; border-radius: 8px;
+  padding: 0.75rem 1.3rem; font-size: 0.9rem; font-family: var(--sans); cursor: pointer;
+}
+button:hover { opacity: 0.88; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.msg { font-size: 0.85rem; margin-top: 1rem; min-height: 1.2em; }
+.msg.ok { color: var(--accent2); }
+.msg.error { color: var(--danger); }
+.back { display: inline-block; margin-top: 1.5rem; color: var(--text3); font-size: 0.82rem; text-decoration: none; }
+.back:hover { color: var(--text2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="box">
+    <h1>☽ Odjava od e-novic</h1>
+    <p>Vnesi e-mail naslov, ki ga želiš odjaviti od prejemanja vabil na dogodke.</p>
+    <form id="unsub-form" onsubmit="handleUnsubscribe(event)">
+      <input type="email" id="unsub-email" placeholder="tvoj@email.com" required autocomplete="email">
+      <button type="submit" id="unsub-btn">Odjavi me</button>
+    </form>
+    <div class="msg" id="unsub-msg"></div>
+    <a href="/" class="back">← Nazaj na stran z dogodki</a>
+  </div>
+</div>
+
+<script>
+async function handleUnsubscribe(e) {
+  e.preventDefault();
+  const btn = document.getElementById('unsub-btn');
+  const msg = document.getElementById('unsub-msg');
+  const email = document.getElementById('unsub-email').value.trim();
+  btn.disabled = true;
+  msg.textContent = '';
+
+  try {
+    const res = await fetch('/api/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = '✦ Uspešno odjavljen/a. Žal nam je, da odhajaš.';
+      document.getElementById('unsub-form').style.display = 'none';
+    } else {
+      msg.className = 'msg error';
+      msg.textContent = data.error || 'Napaka. Poskusi znova.';
+      btn.disabled = false;
+    }
+  } catch {
+    msg.className = 'msg error';
+    msg.textContent = 'Napaka pri povezavi. Poskusi znova.';
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

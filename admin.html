@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentria — Admin</title>
+<style>
+:root {
+  --bg: #0a0a12; --bg2: #10101e; --bg3: #16162a;
+  --card: #1a1a2e; --border: rgba(120,100,255,0.18);
+  --accent: #7c6dfa; --accent2: #c4a44a;
+  --text: #e8e4ff; --text2: #9d97c8; --text3: #5e5a8a;
+  --danger: #e06060; --radius: 12px;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+/* ── LOGIN SCREEN ── */
+.login-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+}
+.login-box {
+  width: 100%; max-width: 380px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 2.5rem 2rem;
+}
+.login-box h1 {
+  font-size: 1.3rem; font-weight: 500; text-align: center; margin-bottom: 0.3rem;
+  letter-spacing: 0.02em;
+}
+.login-box .sub { text-align: center; color: var(--text3); font-size: 0.85rem; margin-bottom: 1.8rem; }
+.field { margin-bottom: 1rem; }
+.field label { display: block; font-size: 0.8rem; color: var(--text2); margin-bottom: 0.4rem; }
+.field input, .field select, .field textarea {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.7rem 0.9rem; color: var(--text); font-family: var(--sans); font-size: 0.92rem; outline: none;
+  transition: border-color 0.2s;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+.field textarea { resize: vertical; min-height: 80px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  padding: 0.7rem 1.3rem; font-size: 0.9rem; font-family: var(--sans); cursor: pointer;
+  transition: opacity 0.2s; width: 100%;
+}
+.btn:hover { opacity: 0.88; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.secondary { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
+.btn.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+.btn.small { width: auto; padding: 0.5rem 1rem; font-size: 0.82rem; }
+.err-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.8rem; text-align: center; min-height: 1.2em; }
+.hint { color: var(--text3); font-size: 0.78rem; margin-top: 1.2rem; text-align: center; line-height: 1.5; }
+
+/* ── APP SHELL ── */
+.app { display: none; min-height: 100vh; }
+.app.active { display: block; }
+
+header.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--bg2);
+  position: sticky; top: 0; z-index: 10;
+}
+header.topbar h1 { font-size: 1.05rem; font-weight: 500; }
+header.topbar .who { font-size: 0.8rem; color: var(--text3); }
+header.topbar .actions { display: flex; gap: 0.6rem; align-items: center; }
+
+nav.tabs {
+  display: flex; gap: 0.3rem; padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--border);
+  overflow-x: auto; background: var(--bg2);
+}
+nav.tabs button {
+  background: transparent; border: none; color: var(--text3); padding: 0.5rem 1rem;
+  border-radius: 8px; font-size: 0.88rem; cursor: pointer; white-space: nowrap;
+  font-family: var(--sans); transition: all 0.15s;
+}
+nav.tabs button.active { background: var(--card); color: var(--accent2); }
+nav.tabs button:hover:not(.active) { color: var(--text2); }
+
+main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+.panel { display: none; }
+.panel.active { display: block; }
+
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.5rem; margin-bottom: 1.2rem;
+}
+.card h2 { font-size: 1rem; font-weight: 500; margin-bottom: 1.2rem; color: var(--text); }
+.row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.row .field { flex: 1; min-width: 200px; }
+.checkbox-field { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.checkbox-field input { width: auto; }
+.checkbox-field label { margin: 0; font-size: 0.88rem; color: var(--text2); }
+
+/* event list */
+.event-row {
+  display: flex; align-items: center; gap: 1rem; padding: 0.9rem; border-radius: 8px;
+  border: 1px solid var(--border); margin-bottom: 0.6rem; background: var(--bg3);
+}
+.event-row .thumb {
+  width: 52px; height: 52px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+  background: var(--bg2); display: flex; align-items: center; justify-content: center; color: var(--text3);
+}
+.event-row .info { flex: 1; min-width: 0; }
+.event-row .info h3 { font-size: 0.92rem; font-weight: 500; margin-bottom: 0.2rem; }
+.event-row .info .meta { font-size: 0.78rem; color: var(--text3); }
+.event-row .status {
+  font-size: 0.72rem; padding: 0.2em 0.6em; border-radius: 100px; white-space: nowrap;
+}
+.event-row .status.pub { background: rgba(124,109,250,0.15); color: var(--accent); }
+.event-row .status.draft { background: rgba(160,160,160,0.1); color: var(--text3); }
+.event-row .row-actions { display: flex; gap: 0.4rem; }
+.icon-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text2);
+  width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+/* theme picker */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 0.8rem; margin-bottom: 1.5rem; }
+.theme-opt {
+  border: 2px solid var(--border); border-radius: 10px; padding: 0.8rem; cursor: pointer;
+  transition: border-color 0.2s; text-align: center;
+}
+.theme-opt.selected { border-color: var(--accent); }
+.theme-swatch { height: 40px; border-radius: 6px; margin-bottom: 0.5rem; }
+.theme-opt span { font-size: 0.78rem; color: var(--text2); }
+
+.color-tag-picker { display: flex; gap: 0.5rem; padding-top: 0.3rem; }
+.color-tag-opt {
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+  border: 2px solid transparent; transition: border-color 0.15s, transform 0.15s;
+}
+.color-tag-opt:hover { transform: scale(1.08); }
+.color-tag-opt.selected { border-color: var(--text); }
+
+.mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; }
+.mode-opt {
+  border: 2px solid var(--border); border-radius: 10px; padding: 1rem 0.6rem; cursor: pointer;
+  text-align: center; transition: border-color 0.2s;
+}
+.mode-opt.selected { border-color: var(--accent); background: rgba(124,109,250,0.06); }
+.mode-opt .icon { font-size: 1.4rem; margin-bottom: 0.4rem; }
+.mode-opt span { font-size: 0.82rem; color: var(--text2); display: block; }
+
+.toast {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+  background: var(--card); border: 1px solid var(--accent); border-radius: 8px;
+  padding: 0.8rem 1.4rem; font-size: 0.85rem; z-index: 100;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.toast.show { opacity: 1; }
+.toast.error { border-color: var(--danger); color: var(--danger); }
+
+.user-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.8rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.5rem;
+  background: var(--bg3);
+}
+.user-row .uinfo { font-size: 0.88rem; }
+.user-row .uinfo .role { color: var(--text3); font-size: 0.76rem; margin-left: 0.5rem; }
+.badge-mc { color: var(--accent2); font-size: 0.72rem; margin-left: 0.5rem; }
+
+.empty-hint { color: var(--text3); font-size: 0.88rem; text-align: center; padding: 2rem 0; font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<div class="login-wrap" id="login-screen">
+  <div class="login-box">
+    <h1>✦ Sentria Admin</h1>
+    <p class="sub">Prijava v nadzorno ploščo</p>
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="field">
+        <label>Uporabniško ime</label>
+        <input type="text" id="login-username" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label>Geslo</label>
+        <input type="password" id="login-password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" type="submit" id="login-btn">Prijava</button>
+      <div class="err-msg" id="login-err"></div>
+    </form>
+    <p class="hint">Prva prijava? Uporabi generično geslo, ki ti je bilo posredovano. Po prijavi boš pozvan/a k menjavi gesla.</p>
+  </div>
+</div>
+
+<!-- ═══════════ FORCE PASSWORD CHANGE ═══════════ -->
+<div class="login-wrap" id="change-pw-screen" style="display:none">
+  <div class="login-box">
+    <h1>⚿ Nastavi novo geslo</h1>
+    <p class="sub">To je tvoja prva prijava — prosimo, nastavi varno geslo</p>
+    <form id="forced-pw-form" onsubmit="handleForcedPasswordChange(event)">
+      <div class="field">
+        <label>Trenutno geslo</label>
+        <input type="password" id="fpw-old" required>
+      </div>
+      <div class="field">
+        <label>Novo geslo (min. 8 znakov)</label>
+        <input type="password" id="fpw-new" minlength="8" required>
+      </div>
+      <div class="field">
+        <label>Potrdi novo geslo</label>
+        <input type="password" id="fpw-confirm" minlength="8" required>
+      </div>
+      <button class="btn" type="submit" id="fpw-btn">Nastavi geslo</button>
+      <div class="err-msg" id="fpw-err"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════ MAIN APP ═══════════ -->
+<div class="app" id="app">
+  <header class="topbar">
+    <h1>✦ Sentria Admin</h1>
+    <div class="actions">
+      <span class="who" id="who-label"></span>
+      <button class="btn secondary small" onclick="logout()">Odjava</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" data-tab="events" onclick="switchTab('events')">Dogodki</button>
+    <button data-tab="subscribers" onclick="switchTab('subscribers')">Naročniki</button>
+    <button data-tab="settings" onclick="switchTab('settings')">Nastavitve</button>
+    <button data-tab="account" onclick="switchTab('account')">Račun</button>
+    <button id="users-tab-btn" data-tab="users" onclick="switchTab('users')" style="display:none">Uporabniki</button>
+  </nav>
+
+  <main class="content">
+
+    <!-- EVENTS PANEL -->
+    <div class="panel active" id="panel-events">
+      <div class="card">
+        <h2 id="event-form-title">Nov dogodek</h2>
+        <form id="event-form" onsubmit="handleSaveEvent(event)">
+          <input type="hidden" id="ev-id">
+          <div class="field">
+            <label>Naslov dogodka *</label>
+            <input type="text" id="ev-title" required>
+          </div>
+          <div class="field">
+            <label>Opis</label>
+            <textarea id="ev-description" placeholder="Opiši dogodek, vsebino, kaj naj udeleženci pričakujejo..."></textarea>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Datum</label>
+              <input type="date" id="ev-date">
+            </div>
+            <div class="field">
+              <label>Ura</label>
+              <input type="time" id="ev-time">
+            </div>
+          </div>
+          <div class="checkbox-field">
+            <input type="checkbox" id="ev-online" onchange="toggleLocationLabel()">
+            <label for="ev-online">Online dogodek</label>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label id="ev-location-label">Lokacija (kraj)</label>
+              <input type="text" id="ev-location" placeholder="npr. Ljubljana, Studio Sanj">
+            </div>
+            <div class="field">
+              <label id="ev-locationurl-label">Povezava (zemljevid / online link)</label>
+              <input type="url" id="ev-locationurl" placeholder="https://...">
+            </div>
+          </div>
+          <div class="field">
+            <label>Slika dogodka (neobvezno)</label>
+            <div style="display:flex; gap:0.6rem; align-items:center; margin-bottom:0.6rem">
+              <input type="file" id="ev-image-file" accept="image/jpeg,image/png,image/webp,image/gif" style="flex:1; font-size:0.85rem" onchange="handleImageUpload(event)">
+              <span id="upload-status" style="font-size:0.8rem; color:var(--text3); white-space:nowrap"></span>
+            </div>
+            <input type="url" id="ev-image" placeholder="...ali prilepi URL slike">
+            <div id="image-preview" style="margin-top:0.6rem"></div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Tip dogodka</label>
+              <select id="ev-eventtype">
+                <option value="single">Enkraten dogodek</option>
+                <option value="recurring">Serija / ponavljajoč dogodek</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Barvni ton dogodka</label>
+              <div class="color-tag-picker" id="ev-color-picker">
+                <div class="color-tag-opt selected" data-color="oneiro-dark" onclick="selectEventColor('oneiro-dark')" title="Oneiro Dark" style="background:linear-gradient(135deg,#0a0a12,#7c6dfa)"></div>
+                <div class="color-tag-opt" data-color="forest-dream" onclick="selectEventColor('forest-dream')" title="Forest Dream" style="background:linear-gradient(135deg,#080e0a,#52b478)"></div>
+                <div class="color-tag-opt" data-color="ember-trance" onclick="selectEventColor('ember-trance')" title="Ember Trance" style="background:linear-gradient(135deg,#100807,#d4622a)"></div>
+                <div class="color-tag-opt" data-color="void" onclick="selectEventColor('void')" title="Void" style="background:linear-gradient(135deg,#000,#9080e8)"></div>
+              </div>
+            </div>
+          </div>
+          <div class="checkbox-field">
+            <input type="checkbox" id="ev-published" checked>
+            <label for="ev-published">Objavljeno (vidno na javni strani)</label>
+          </div>
+          <div style="display:flex; gap:0.6rem">
+            <button class="btn" type="submit" id="ev-save-btn">Shrani dogodek</button>
+            <button class="btn secondary" type="button" id="ev-cancel-btn" onclick="resetEventForm()" style="display:none">Prekliči urejanje</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Obstoječi dogodki</h2>
+        <div id="events-list"><p class="empty-hint">Nalaganje...</p></div>
+      </div>
+    </div>
+
+    <!-- SUBSCRIBERS PANEL -->
+    <div class="panel" id="panel-subscribers">
+      <div class="card">
+        <h2>Naročniki na e-novice</h2>
+        <div style="display:flex; gap:0.6rem; margin-bottom:1.2rem; flex-wrap:wrap">
+          <button class="btn" style="width:auto" onclick="exportCsv()">⬇ Izvozi CSV</button>
+          <button class="btn secondary" style="width:auto" onclick="copyEmails()">⧉ Kopiraj e-maile (za BCC)</button>
+        </div>
+        <div id="subscribers-list"><p class="empty-hint">Nalaganje...</p></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS PANEL -->
+    <div class="panel" id="panel-settings">
+      <div class="card">
+        <h2>Način prikaza</h2>
+        <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1rem">Velja za celotno javno stran. Barvni ton se nastavlja posamično pri vsakem dogodku.</p>
+        <div class="mode-grid" id="mode-grid">
+          <div class="mode-opt" data-mode="single" onclick="selectMode('single')">
+            <div class="icon">▭</div><span>Single<br><small style="color:var(--text3)">en pod drugim</small></span>
+          </div>
+          <div class="mode-opt" data-mode="catalog" onclick="selectMode('catalog')">
+            <div class="icon">▦</div><span>Catalog<br><small style="color:var(--text3)">mreža</small></span>
+          </div>
+          <div class="mode-opt" data-mode="series" onclick="selectMode('series')">
+            <div class="icon">⋮</div><span>Series<br><small style="color:var(--text3)">časovnica</small></span>
+          </div>
+        </div>
+
+        <h2>Vsebina strani</h2>
+        <div class="field">
+          <label>Naslov strani</label>
+          <input type="text" id="set-title">
+        </div>
+        <div class="field">
+          <label>Podnaslov</label>
+          <input type="text" id="set-subtitle">
+        </div>
+        <div class="checkbox-field">
+          <input type="checkbox" id="set-collectname">
+          <label for="set-collectname">Zbiraj tudi ime (poleg e-maila)</label>
+        </div>
+        <div class="field">
+          <label>Besedilo v nogi strani</label>
+          <input type="text" id="set-footer">
+        </div>
+        <button class="btn" style="width:auto" onclick="saveSettings()">Shrani nastavitve</button>
+      </div>
+    </div>
+
+    <!-- ACCOUNT PANEL -->
+    <div class="panel" id="panel-account">
+      <div class="card">
+        <h2>Tvoje ime</h2>
+        <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1rem">Prikazano namesto uporabniškega imena po sistemu. Lahko ga kadarkoli spremeniš.</p>
+        <form onsubmit="handleSetName(event)">
+          <div class="field">
+            <label>Ime</label>
+            <input type="text" id="name-input" maxlength="60" placeholder="npr. Maja">
+          </div>
+          <button class="btn" style="width:auto" type="submit">Shrani ime</button>
+          <div class="err-msg" id="name-msg"></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Menjava gesla</h2>
+        <form onsubmit="handleChangePassword(event)">
+          <div class="field">
+            <label>Trenutno geslo</label>
+            <input type="password" id="pw-old" required>
+          </div>
+          <div class="field">
+            <label>Novo geslo (min. 8 znakov)</label>
+            <input type="password" id="pw-new" minlength="8" required>
+          </div>
+          <button class="btn" style="width:auto" type="submit">Posodobi geslo</button>
+          <div class="err-msg" id="pw-msg"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- USERS PANEL (master only) -->
+    <div class="panel" id="panel-users">
+      <div class="card">
+        <h2>Dodaj novega vnašalca</h2>
+        <form onsubmit="handleAddUser(event)">
+          <div class="row">
+            <div class="field">
+              <label>Uporabniško ime</label>
+              <input type="text" id="nu-username" required>
+            </div>
+            <div class="field">
+              <label>Začasno geslo</label>
+              <input type="text" id="nu-password" required minlength="8">
+            </div>
+          </div>
+          <div class="field">
+            <label>Vloga</label>
+            <select id="nu-role">
+              <option value="admin">Admin</option>
+              <option value="editor">Urednik (editor)</option>
+            </select>
+          </div>
+          <button class="btn" style="width:auto" type="submit">Dodaj uporabnika</button>
+          <div class="err-msg" id="nu-msg"></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Obstoječi uporabniki</h2>
+        <div id="users-list"><p class="empty-hint">Nalaganje...</p></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/api';
+let token = localStorage.getItem('sentria_token') || null;
+let userRole = localStorage.getItem('sentria_role') || null;
+let username = localStorage.getItem('sentria_username') || null;
+let pendingMustChange = null; // holds {username,password,token,role} during forced change flow
+let currentMode = 'single';
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 2500);
+}
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+}
+
+async function apiCall(path, options = {}) {
+  const res = await fetch(`${API}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) }
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    if (res.status === 401) { logout(); throw new Error('Seja je potekla, prijavi se znova.'); }
+    throw new Error(data.error || 'Napaka');
+  }
+  return data;
+}
+
+/* ── LOGIN ── */
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-err');
+  const u = document.getElementById('login-username').value.trim();
+  const p = document.getElementById('login-password').value;
+  btn.disabled = true; err.textContent = '';
+
+  try {
+    const res = await fetch(`${API}/auth?action=login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const data = await res.json();
+    if (!data.ok) { err.textContent = data.error || 'Napačno uporabniško ime ali geslo.'; btn.disabled = false; return; }
+
+    if (data.mustChangePassword) {
+      pendingMustChange = { username: data.username, oldPassword: p, token: data.token, role: data.role };
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('change-pw-screen').style.display = 'flex';
+      return;
+    }
+
+    token = data.token; userRole = data.role; username = data.username;
+    localStorage.setItem('sentria_token', token);
+    localStorage.setItem('sentria_role', userRole);
+    localStorage.setItem('sentria_username', username);
+    enterApp();
+  } catch {
+    err.textContent = 'Napaka pri povezavi.';
+    btn.disabled = false;
+  }
+}
+
+async function handleForcedPasswordChange(e) {
+  e.preventDefault();
+  const btn = document.getElementById('fpw-btn');
+  const err = document.getElementById('fpw-err');
+  const newPw = document.getElementById('fpw-new').value;
+  const confirmPw = document.getElementById('fpw-confirm').value;
+  if (newPw !== confirmPw) { err.textContent = 'Gesli se ne ujemata.'; return; }
+  btn.disabled = true; err.textContent = '';
+
+  try {
+    const res = await fetch(`${API}/auth?action=change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${pendingMustChange.token}` },
+      body: JSON.stringify({ oldPassword: document.getElementById('fpw-old').value, newPassword: newPw })
+    });
+    const data = await res.json();
+    if (!data.ok) { err.textContent = data.error || 'Napaka pri menjavi gesla.'; btn.disabled = false; return; }
+
+    token = pendingMustChange.token; userRole = pendingMustChange.role; username = pendingMustChange.username;
+    localStorage.setItem('sentria_token', token);
+    localStorage.setItem('sentria_role', userRole);
+    localStorage.setItem('sentria_username', username);
+    document.getElementById('change-pw-screen').style.display = 'none';
+    enterApp();
+    showToast('Geslo uspešno nastavljeno.');
+  } catch {
+    err.textContent = 'Napaka pri povezavi.';
+    btn.disabled = false;
+  }
+}
+
+function logout() {
+  localStorage.removeItem('sentria_token');
+  localStorage.removeItem('sentria_role');
+  localStorage.removeItem('sentria_username');
+  token = null; userRole = null; username = null;
+  document.getElementById('app').classList.remove('active');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-form').reset();
+}
+
+function enterApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('change-pw-screen').style.display = 'none';
+  document.getElementById('app').classList.add('active');
+  document.getElementById('who-label').textContent = `${username} (${userRole})`;
+  if (userRole === 'master') document.getElementById('users-tab-btn').style.display = '';
+  loadEvents();
+  loadSettings();
+  loadMyName();
+  loadSubscribers();
+  if (userRole === 'master') loadUsers();
+}
+
+async function loadMyName() {
+  try {
+    const data = await apiCall('/auth?action=me');
+    if (data.displayName) {
+      document.getElementById('who-label').textContent = `${data.displayName} (${userRole})`;
+      document.getElementById('name-input').value = data.displayName;
+    }
+  } catch (e) { /* non-critical, ignore */ }
+}
+
+/* ── TABS ── */
+function switchTab(tab) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+}
+
+/* ── EVENTS ── */
+async function loadEvents() {
+  try {
+    const data = await apiCall('/admin/events');
+    renderEventsList(data.events || []);
+  } catch (e) { showToast(e.message, true); }
+}
+
+const COLOR_SWATCHES = {
+  'oneiro-dark': 'linear-gradient(135deg,#0a0a12,#7c6dfa)',
+  'forest-dream': 'linear-gradient(135deg,#080e0a,#52b478)',
+  'ember-trance': 'linear-gradient(135deg,#100807,#d4622a)',
+  'void': 'linear-gradient(135deg,#000,#9080e8)'
+};
+
+function renderEventsList(events) {
+  const el = document.getElementById('events-list');
+  if (!events.length) { el.innerHTML = '<p class="empty-hint">Še ni dogodkov. Dodaj prvega zgoraj.</p>'; return; }
+  events.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  el.innerHTML = events.map(ev => `
+    <div class="event-row">
+      ${ev.imageUrl ? `<img class="thumb" src="${ev.imageUrl}" onerror="this.outerHTML='<div class=&quot;thumb&quot;>☽</div>'">` : '<div class="thumb">☽</div>'}
+      <div class="info">
+        <h3>${ev.title}</h3>
+        <div class="meta">${ev.date || 'brez datuma'}${ev.time ? ' · ' + ev.time : ''} ${ev.isOnline === 'true' ? '· 🔗 Online' : ev.location ? '· 📍 ' + ev.location : ''}${ev.eventType === 'recurring' ? ' · ↻ Serija' : ''}</div>
+      </div>
+      <div class="color-tag-opt" style="width:18px;height:18px;border-radius:5px;flex-shrink:0;background:${COLOR_SWATCHES[ev.colorTag] || COLOR_SWATCHES['oneiro-dark']}" title="${ev.colorTag || 'oneiro-dark'}"></div>
+      <span class="status ${ev.published === 'true' ? 'pub' : 'draft'}">${ev.published === 'true' ? 'Objavljeno' : 'Osnutek'}</span>
+      <div class="row-actions">
+        <button class="icon-btn" title="Uredi" onclick='editEvent(${JSON.stringify(ev)})'>✎</button>
+        <button class="icon-btn del" title="Izbriši" onclick="deleteEvent('${ev.id}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleLocationLabel() {
+  const online = document.getElementById('ev-online').checked;
+  document.getElementById('ev-location-label').textContent = online ? 'Platforma (npr. Zoom)' : 'Lokacija (kraj)';
+  document.getElementById('ev-locationurl-label').textContent = online ? 'Online povezava (link za pridružitev)' : 'Povezava (zemljevid)';
+}
+
+async function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('upload-status');
+
+  if (file.size > 5 * 1024 * 1024) {
+    status.textContent = 'Datoteka prevelika (max 5MB)';
+    status.style.color = 'var(--danger)';
+    e.target.value = '';
+    return;
+  }
+
+  status.textContent = 'Nalagam...';
+  status.style.color = 'var(--text3)';
+
+  try {
+    const res = await fetch(`${API}/admin/upload-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type, 'Authorization': `Bearer ${token}` },
+      body: file
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Napaka pri nalaganju');
+
+    document.getElementById('ev-image').value = data.url;
+    status.textContent = '✓ Naloženo';
+    status.style.color = 'var(--accent2)';
+    showImagePreview(data.url);
+  } catch (err) {
+    status.textContent = 'Napaka pri nalaganju';
+    status.style.color = 'var(--danger)';
+    showToast(err.message, true);
+  }
+}
+
+function showImagePreview(url) {
+  const el = document.getElementById('image-preview');
+  if (!url) { el.innerHTML = ''; return; }
+  el.innerHTML = `<img src="${url}" style="max-width:200px; max-height:120px; border-radius:8px; border:1px solid var(--border)" onerror="this.style.display='none'">`;
+}
+
+let currentEventColor = 'oneiro-dark';
+function selectEventColor(color) {
+  currentEventColor = color;
+  document.querySelectorAll('#ev-color-picker .color-tag-opt').forEach(el => el.classList.toggle('selected', el.dataset.color === color));
+}
+
+function editEvent(ev) {
+  document.getElementById('ev-id').value = ev.id;
+  document.getElementById('ev-title').value = ev.title || '';
+  document.getElementById('ev-description').value = ev.description || '';
+  document.getElementById('ev-date').value = ev.date || '';
+  document.getElementById('ev-time').value = ev.time || '';
+  document.getElementById('ev-online').checked = ev.isOnline === 'true';
+  document.getElementById('ev-location').value = ev.location || '';
+  document.getElementById('ev-locationurl').value = ev.locationUrl || '';
+  document.getElementById('ev-image').value = ev.imageUrl || '';
+  showImagePreview(ev.imageUrl || '');
+  document.getElementById('ev-eventtype').value = ev.eventType === 'recurring' ? 'recurring' : 'single';
+  selectEventColor(ev.colorTag || 'oneiro-dark');
+  document.getElementById('ev-published').checked = ev.published === 'true';
+  document.getElementById('event-form-title').textContent = 'Uredi dogodek';
+  document.getElementById('ev-save-btn').textContent = 'Posodobi dogodek';
+  document.getElementById('ev-cancel-btn').style.display = 'inline-flex';
+  toggleLocationLabel();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetEventForm() {
+  document.getElementById('event-form').reset();
+  document.getElementById('ev-id').value = '';
+  document.getElementById('event-form-title').textContent = 'Nov dogodek';
+  document.getElementById('ev-save-btn').textContent = 'Shrani dogodek';
+  document.getElementById('ev-cancel-btn').style.display = 'none';
+  document.getElementById('ev-published').checked = true;
+  document.getElementById('ev-eventtype').value = 'single';
+  document.getElementById('upload-status').textContent = '';
+  showImagePreview('');
+  selectEventColor('oneiro-dark');
+  toggleLocationLabel();
+}
+
+async function handleSaveEvent(e) {
+  e.preventDefault();
+  const payload = {
+    id: document.getElementById('ev-id').value || undefined,
+    title: document.getElementById('ev-title').value.trim(),
+    description: document.getElementById('ev-description').value.trim(),
+    date: document.getElementById('ev-date').value,
+    time: document.getElementById('ev-time').value,
+    isOnline: document.getElementById('ev-online').checked,
+    location: document.getElementById('ev-location').value.trim(),
+    locationUrl: document.getElementById('ev-locationurl').value.trim(),
+    imageUrl: document.getElementById('ev-image').value.trim(),
+    eventType: document.getElementById('ev-eventtype').value,
+    colorTag: currentEventColor,
+    published: document.getElementById('ev-published').checked
+  };
+  try {
+    await apiCall('/admin/events', { method: 'POST', body: JSON.stringify(payload) });
+    showToast('Dogodek shranjen.');
+    resetEventForm();
+    loadEvents();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function deleteEvent(id) {
+  if (!confirm('Izbrišem ta dogodek?')) return;
+  try {
+    await apiCall(`/admin/events?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    showToast('Dogodek izbrisan.');
+    loadEvents();
+  } catch (e) { showToast(e.message, true); }
+}
+
+/* ── SETTINGS ── */
+async function loadSettings() {
+  try {
+    const data = await apiCall('/admin/settings');
+    const s = data.settings || {};
+    currentMode = s.displayMode || 'single';
+    selectMode(currentMode);
+    document.getElementById('set-title').value = s.siteTitle || '';
+    document.getElementById('set-subtitle').value = s.siteSubtitle || '';
+    document.getElementById('set-collectname').checked = s.collectName !== 'false';
+    document.getElementById('set-footer').value = s.footerText || '';
+  } catch (e) { showToast(e.message, true); }
+}
+
+function selectMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-opt').forEach(el => el.classList.toggle('selected', el.dataset.mode === mode));
+}
+
+async function saveSettings() {
+  try {
+    await apiCall('/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify({
+        displayMode: currentMode,
+        siteTitle: document.getElementById('set-title').value,
+        siteSubtitle: document.getElementById('set-subtitle').value,
+        collectName: document.getElementById('set-collectname').checked,
+        footerText: document.getElementById('set-footer').value
+      })
+    });
+    showToast('Nastavitve shranjene.');
+  } catch (e) { showToast(e.message, true); }
+}
+
+/* ── ACCOUNT ── */
+async function handleSetName(e) {
+  e.preventDefault();
+  const msg = document.getElementById('name-msg');
+  msg.style.color = 'var(--danger)'; msg.textContent = '';
+  try {
+    const data = await apiCall('/auth?action=set-name', {
+      method: 'POST',
+      body: JSON.stringify({ displayName: document.getElementById('name-input').value.trim() })
+    });
+    msg.style.color = 'var(--accent2)';
+    msg.textContent = 'Ime shranjeno.';
+    document.getElementById('who-label').textContent = `${data.displayName || username} (${userRole})`;
+  } catch (e) { msg.textContent = e.message; }
+}
+
+async function handleChangePassword(e) {
+  e.preventDefault();
+  const msg = document.getElementById('pw-msg');
+  msg.style.color = 'var(--danger)'; msg.textContent = '';
+  try {
+    await apiCall('/auth?action=change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        oldPassword: document.getElementById('pw-old').value,
+        newPassword: document.getElementById('pw-new').value
+      })
+    });
+    msg.style.color = 'var(--accent2)';
+    msg.textContent = 'Geslo uspešno posodobljeno.';
+    document.getElementById('pw-old').value = '';
+    document.getElementById('pw-new').value = '';
+  } catch (e) { msg.textContent = e.message; }
+}
+
+/* ── USERS (master) ── */
+async function loadUsers() {
+  try {
+    const data = await apiCall('/admin/users');
+    renderUsersList(data.users || []);
+  } catch (e) { /* silently ignore if not master */ }
+}
+
+function renderUsersList(users) {
+  const el = document.getElementById('users-list');
+  if (!users.length) { el.innerHTML = '<p class="empty-hint">Ni dodatnih uporabnikov.</p>'; return; }
+  el.innerHTML = users.map(u => `
+    <div class="user-row">
+      <div class="uinfo">${u.username}<span class="role">${u.role}</span>${u.mustChangePassword === 'true' ? '<span class="badge-mc">⚿ čaka na menjavo gesla</span>' : ''}</div>
+      ${u.username !== username ? `<button class="icon-btn del" onclick="deleteUser('${u.username}')">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+
+async function handleAddUser(e) {
+  e.preventDefault();
+  const msg = document.getElementById('nu-msg');
+  msg.textContent = '';
+  try {
+    await apiCall('/auth?action=add-user', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: document.getElementById('nu-username').value.trim(),
+        password: document.getElementById('nu-password').value,
+        role: document.getElementById('nu-role').value
+      })
+    });
+    showToast('Uporabnik dodan.');
+    document.getElementById('nu-username').value = '';
+    document.getElementById('nu-password').value = '';
+    loadUsers();
+  } catch (e) { msg.textContent = e.message; }
+}
+
+async function deleteUser(u) {
+  if (!confirm(`Izbrišem uporabnika "${u}"?`)) return;
+  try {
+    await apiCall(`/admin/users?username=${encodeURIComponent(u)}`, { method: 'DELETE' });
+    showToast('Uporabnik izbrisan.');
+    loadUsers();
+  } catch (e) { showToast(e.message, true); }
+}
+
+/* ── SUBSCRIBERS ── */
+let allSubscribers = [];
+async function loadSubscribers() {
+  try {
+    const data = await apiCall('/admin/subscribers');
+    allSubscribers = data.subscribers || [];
+    renderSubscribersList(allSubscribers);
+  } catch (e) {
+    document.getElementById('subscribers-list').innerHTML = '<p class="empty-hint">Napaka pri nalaganju naročnikov.</p>';
+  }
+}
+
+function renderSubscribersList(subs) {
+  const el = document.getElementById('subscribers-list');
+  if (!subs.length) { el.innerHTML = '<p class="empty-hint">Še ni naročnikov.</p>'; return; }
+  el.innerHTML = `<p style="color:var(--text3); font-size:0.82rem; margin-bottom:0.8rem">${subs.length} naročnik${subs.length === 1 ? '' : subs.length < 5 ? 'i' : 'ov'}</p>` +
+    subs.map(s => `
+    <div class="user-row">
+      <div class="uinfo">${s.email}${s.name ? `<span class="role">${s.name}</span>` : ''}</div>
+      <span style="color:var(--text3); font-size:0.76rem">${s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString('sl-SI') : ''}</span>
+    </div>
+  `).join('');
+}
+
+function copyEmails() {
+  if (!allSubscribers.length) { showToast('Ni naročnikov za kopiranje.', true); return; }
+  const emails = allSubscribers.map(s => s.email).join(', ');
+  navigator.clipboard.writeText(emails)
+    .then(() => showToast(`${allSubscribers.length} e-mailov kopiranih v odložišče.`))
+    .catch(() => showToast('Kopiranje ni uspelo. Preveri dovoljenja brskalnika.', true));
+}
+
+/* ── EXPORT ── */
+function exportCsv() {
+  fetch(`${API}/admin/export`, { headers: authHeaders() })
+    .then(res => res.blob())
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `subscribers_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    })
+    .catch(() => showToast('Napaka pri izvozu.', true));
+}
+
+/* ── INIT ── */
+if (token) { enterApp(); } else { document.getElementById('login-screen').style.display = 'flex'; }
+toggleLocationLabel();
+</script>
+</body>
+</html>
