@@ -30,10 +30,12 @@ export default async function handler(req, res) {
     const ext = contentType.split('/')[1];
     const filename = `events/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
+    // No explicit token — @vercel/blob SDK auto-detects OIDC credentials
+    // (VERCEL_OIDC_TOKEN + BLOB_STORE_ID) when the store is connected via OIDC,
+    // which is the default for stores connected directly within a project.
     const blob = await put(filename, req, {
       access: 'public',
-      contentType,
-      token: process.env.BLOB_READ_WRITE_TOKEN
+      contentType
     });
 
     return ok(res, { url: blob.url }, 201);
