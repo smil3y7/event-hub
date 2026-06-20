@@ -126,8 +126,9 @@ header p {
 }
 .event-image {
   width: 100%;
-  aspect-ratio: 16/9;
-  object-fit: cover;
+  max-height: 65vh;
+  object-fit: contain;
+  background: var(--bg3);
   border-radius: var(--radius);
   border: 1px solid var(--border);
   display: block;

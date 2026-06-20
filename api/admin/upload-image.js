@@ -68,14 +68,6 @@ export default async function handler(req, res) {
       // internal OIDC resolution (v2.x only, requires @vercel/blob >= ~2.0).
     }
 
-    console.log('upload-image credential check:', {
-      blobSdkVersion: 'expects v2.x for OIDC',
-      hasStaticToken: !!process.env.BLOB_READ_WRITE_TOKEN,
-      hasOidcHeader: !!req.headers['x-vercel-oidc-token'],
-      hasStoreId: !!process.env.BLOB_STORE_ID,
-      resolvedMode: putOptions.token ? 'static-token' : (putOptions.oidcToken ? 'manual-oidc' : 'sdk-internal-oidc')
-    });
-
     const blob = await put(filename, buffer, putOptions);
 
     return ok(res, { url: blob.url }, 201);
