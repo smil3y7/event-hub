@@ -52,28 +52,28 @@ export default async function handler(req, res) {
 
     const putOptions = { access: 'public', contentType };
 
-    // Resolve credentials with multiple fallbacks, in order of preference:
-    // 1. Static BLOB_READ_WRITE_TOKEN env var, if it exists.
-    // 2. Manual OIDC: the x-vercel-oidc-token header + BLOB_STORE_ID env var.
-    //    process.env.VERCEL_OIDC_TOKEN auto-detection by the SDK has been
-    //    unreliable for this project's setup (plain Vercel Functions, no Next.js),
-    //    so we read the header directly and pass it explicitly.
+    // @vercel/blob v2.x has built-in OIDC support and resolves credentials
+    // automatically (BLOB_READ_WRITE_TOKEN, then internal OIDC token resolution).
+    // We only pass things explicitly as a fallback in case the SDK's own
+    // OIDC resolution doesn't pick up the request context correctly.
     if (process.env.BLOB_READ_WRITE_TOKEN) {
       putOptions.token = process.env.BLOB_READ_WRITE_TOKEN;
-    } else {
-      const oidcToken = req.headers['x-vercel-oidc-token'] || process.env.VERCEL_OIDC_TOKEN;
-      if (oidcToken && process.env.BLOB_STORE_ID) {
+    } else if (process.env.BLOB_STORE_ID) {
+      const oidcToken = req.headers['x-vercel-oidc-token'];
+      if (oidcToken) {
         putOptions.oidcToken = oidcToken;
         putOptions.storeId = process.env.BLOB_STORE_ID;
       }
+      // else: leave putOptions as-is and let the SDK attempt its own
+      // internal OIDC resolution (v2.x only, requires @vercel/blob >= ~2.0).
     }
 
     console.log('upload-image credential check:', {
+      blobSdkVersion: 'expects v2.x for OIDC',
       hasStaticToken: !!process.env.BLOB_READ_WRITE_TOKEN,
       hasOidcHeader: !!req.headers['x-vercel-oidc-token'],
-      hasOidcEnv: !!process.env.VERCEL_OIDC_TOKEN,
       hasStoreId: !!process.env.BLOB_STORE_ID,
-      resolvedMode: putOptions.token ? 'static-token' : (putOptions.oidcToken ? 'manual-oidc' : 'none-sdk-default')
+      resolvedMode: putOptions.token ? 'static-token' : (putOptions.oidcToken ? 'manual-oidc' : 'sdk-internal-oidc')
     });
 
     const blob = await put(filename, buffer, putOptions);
