@@ -50,13 +50,33 @@ export default async function handler(req, res) {
     const ext = contentType.split('/')[1];
     const filename = `events/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    // No explicit token — @vercel/blob SDK auto-detects OIDC credentials
-    // (VERCEL_OIDC_TOKEN + BLOB_STORE_ID) when the store is connected via OIDC,
-    // which is the default for stores connected directly within a project.
-    const blob = await put(filename, buffer, {
-      access: 'public',
-      contentType
+    const putOptions = { access: 'public', contentType };
+
+    // Resolve credentials with multiple fallbacks, in order of preference:
+    // 1. Static BLOB_READ_WRITE_TOKEN env var, if it exists.
+    // 2. Manual OIDC: the x-vercel-oidc-token header + BLOB_STORE_ID env var.
+    //    process.env.VERCEL_OIDC_TOKEN auto-detection by the SDK has been
+    //    unreliable for this project's setup (plain Vercel Functions, no Next.js),
+    //    so we read the header directly and pass it explicitly.
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      putOptions.token = process.env.BLOB_READ_WRITE_TOKEN;
+    } else {
+      const oidcToken = req.headers['x-vercel-oidc-token'] || process.env.VERCEL_OIDC_TOKEN;
+      if (oidcToken && process.env.BLOB_STORE_ID) {
+        putOptions.oidcToken = oidcToken;
+        putOptions.storeId = process.env.BLOB_STORE_ID;
+      }
+    }
+
+    console.log('upload-image credential check:', {
+      hasStaticToken: !!process.env.BLOB_READ_WRITE_TOKEN,
+      hasOidcHeader: !!req.headers['x-vercel-oidc-token'],
+      hasOidcEnv: !!process.env.VERCEL_OIDC_TOKEN,
+      hasStoreId: !!process.env.BLOB_STORE_ID,
+      resolvedMode: putOptions.token ? 'static-token' : (putOptions.oidcToken ? 'manual-oidc' : 'none-sdk-default')
     });
+
+    const blob = await put(filename, buffer, putOptions);
 
     return ok(res, { url: blob.url }, 201);
   } catch (e) {
