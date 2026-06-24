@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sentria — Admin</title>
+<script defer src="/_vercel/insights/script.js"></script>
 <style>
 :root {
   --bg: #0a0a12; --bg2: #10101e; --bg3: #16162a;
@@ -304,6 +305,33 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
             <input type="checkbox" id="ev-published" checked>
             <label for="ev-published">Objavljeno (vidno na javni strani)</label>
           </div>
+          <div style="border-top:1px solid var(--border); margin:1rem 0; padding-top:1rem">
+            <p style="color:var(--text3); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:1rem">Predavatelj / gost (neobvezno)</p>
+            <div class="row">
+              <div class="field">
+                <label>Ime</label>
+                <input type="text" id="ev-speaker-name" placeholder="npr. Jana Novak">
+              </div>
+              <div class="field">
+                <label>Vloga / naziv</label>
+                <input type="text" id="ev-speaker-role" placeholder="npr. Šamanka, terapevtka">
+              </div>
+            </div>
+            <div class="field">
+              <label>Kratka predstavitev</label>
+              <textarea id="ev-speaker-bio" placeholder="Kratko o predavatelju..." style="min-height:60px"></textarea>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Slika predavatelja (URL)</label>
+                <input type="url" id="ev-speaker-image" placeholder="https://...">
+              </div>
+              <div class="field">
+                <label>Spletna stran / link</label>
+                <input type="url" id="ev-speaker-link" placeholder="https://...">
+              </div>
+            </div>
+          </div>
           <div style="display:flex; gap:0.6rem">
             <button class="btn" type="submit" id="ev-save-btn">Shrani dogodek</button>
             <button class="btn secondary" type="button" id="ev-cancel-btn" onclick="resetEventForm()" style="display:none">Prekliči urejanje</button>
@@ -355,15 +383,56 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
           <label>Podnaslov</label>
           <input type="text" id="set-subtitle">
         </div>
+        <div class="field">
+          <label>Hero besedilo (opis namena strani, prikazan pod headerjem)</label>
+          <textarea id="set-hero" style="min-height:90px" placeholder="Kratko opiši, čemu je stran namenjena, koga vabite, kaj ponujate..."></textarea>
+        </div>
         <div class="checkbox-field">
           <input type="checkbox" id="set-collectname">
           <label for="set-collectname">Zbiraj tudi ime (poleg e-maila)</label>
         </div>
         <div class="field">
           <label>Besedilo v nogi strani</label>
-          <input type="text" id="set-footer">
+          <input type="text" id="set-footer" placeholder="npr. kontakt@primer.si · Instagram: @primer">
         </div>
         <button class="btn" style="width:auto" onclick="saveSettings()">Shrani nastavitve</button>
+      </div>
+
+      <div class="card">
+        <h2>Ekipa</h2>
+        <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1.2rem">Člani, ki se prikažejo v hero sekciji javne strani.</p>
+        <form id="team-form" onsubmit="handleSaveTeamMember(event)">
+          <input type="hidden" id="tm-id">
+          <div class="row">
+            <div class="field">
+              <label>Ime *</label>
+              <input type="text" id="tm-name" required>
+            </div>
+            <div class="field">
+              <label>Vloga / naziv</label>
+              <input type="text" id="tm-role" placeholder="npr. Sanjski vodič">
+            </div>
+          </div>
+          <div class="field">
+            <label>Kratka predstavitev</label>
+            <textarea id="tm-bio" style="min-height:60px"></textarea>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Slika (URL)</label>
+              <input type="url" id="tm-image" placeholder="https://...">
+            </div>
+            <div class="field">
+              <label>Spletna stran / link</label>
+              <input type="url" id="tm-link" placeholder="https://...">
+            </div>
+          </div>
+          <div style="display:flex; gap:0.6rem">
+            <button class="btn" type="submit" id="tm-save-btn" style="width:auto">Dodaj člana</button>
+            <button class="btn secondary" type="button" id="tm-cancel-btn" onclick="resetTeamForm()" style="display:none; width:auto">Prekliči</button>
+          </div>
+        </form>
+        <div id="team-list" style="margin-top:1.2rem"><p class="empty-hint">Nalaganje...</p></div>
       </div>
     </div>
 
@@ -715,6 +784,11 @@ function editEvent(ev) {
   document.getElementById('ev-eventtype').value = ev.eventType === 'recurring' ? 'recurring' : 'single';
   selectEventColor(ev.colorTag || 'oneiro-dark');
   document.getElementById('ev-published').checked = ev.published === 'true';
+  document.getElementById('ev-speaker-name').value = ev.speakerName || '';
+  document.getElementById('ev-speaker-role').value = ev.speakerRole || '';
+  document.getElementById('ev-speaker-bio').value = ev.speakerBio || '';
+  document.getElementById('ev-speaker-image').value = ev.speakerImageUrl || '';
+  document.getElementById('ev-speaker-link').value = ev.speakerLink || '';
   document.getElementById('event-form-title').textContent = 'Uredi dogodek';
   document.getElementById('ev-save-btn').textContent = 'Posodobi dogodek';
   document.getElementById('ev-cancel-btn').style.display = 'inline-flex';
@@ -750,7 +824,12 @@ async function handleSaveEvent(e) {
     imageUrl: document.getElementById('ev-image').value.trim(),
     eventType: document.getElementById('ev-eventtype').value,
     colorTag: currentEventColor,
-    published: document.getElementById('ev-published').checked
+    published: document.getElementById('ev-published').checked,
+    speakerName: document.getElementById('ev-speaker-name').value.trim(),
+    speakerRole: document.getElementById('ev-speaker-role').value.trim(),
+    speakerBio: document.getElementById('ev-speaker-bio').value.trim(),
+    speakerImageUrl: document.getElementById('ev-speaker-image').value.trim(),
+    speakerLink: document.getElementById('ev-speaker-link').value.trim()
   };
   try {
     await apiCall('/admin/events', { method: 'POST', body: JSON.stringify(payload) });
@@ -774,12 +853,15 @@ async function loadSettings() {
   try {
     const data = await apiCall('/admin/settings');
     const s = data.settings || {};
+    const members = data.teamMembers || [];
     currentMode = s.displayMode || 'single';
     selectMode(currentMode);
     document.getElementById('set-title').value = s.siteTitle || '';
     document.getElementById('set-subtitle').value = s.siteSubtitle || '';
+    document.getElementById('set-hero').value = s.heroText || '';
     document.getElementById('set-collectname').checked = s.collectName !== 'false';
     document.getElementById('set-footer').value = s.footerText || '';
+    renderTeamList(members);
   } catch (e) { showToast(e.message, true); }
 }
 
@@ -796,11 +878,81 @@ async function saveSettings() {
         displayMode: currentMode,
         siteTitle: document.getElementById('set-title').value,
         siteSubtitle: document.getElementById('set-subtitle').value,
+        heroText: document.getElementById('set-hero').value,
         collectName: document.getElementById('set-collectname').checked,
         footerText: document.getElementById('set-footer').value
       })
     });
     showToast('Nastavitve shranjene.');
+  } catch (e) { showToast(e.message, true); }
+}
+
+/* ── TEAM MEMBERS ── */
+function renderTeamList(members) {
+  const el = document.getElementById('team-list');
+  if (!members.length) { el.innerHTML = '<p class="empty-hint">Še ni članov. Dodaj prvega zgoraj.</p>'; return; }
+  el.innerHTML = members.map(m => `
+    <div class="user-row">
+      <div class="uinfo" style="display:flex; align-items:center; gap:0.8rem">
+        ${m.imageUrl ? `<img src="${m.imageUrl}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : ''}
+        <div>
+          <span>${m.name}</span>${m.role ? `<span class="role">${m.role}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex; gap:0.4rem">
+        <button class="icon-btn" onclick='editTeamMember(${JSON.stringify(m)})' title="Uredi">✎</button>
+        <button class="icon-btn del" onclick="deleteTeamMember('${m.id}')" title="Izbriši">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function editTeamMember(m) {
+  document.getElementById('tm-id').value = m.id;
+  document.getElementById('tm-name').value = m.name || '';
+  document.getElementById('tm-role').value = m.role || '';
+  document.getElementById('tm-bio').value = m.bio || '';
+  document.getElementById('tm-image').value = m.imageUrl || '';
+  document.getElementById('tm-link').value = m.link || '';
+  document.getElementById('tm-save-btn').textContent = 'Posodobi člana';
+  document.getElementById('tm-cancel-btn').style.display = 'inline-flex';
+}
+
+function resetTeamForm() {
+  document.getElementById('team-form').reset();
+  document.getElementById('tm-id').value = '';
+  document.getElementById('tm-save-btn').textContent = 'Dodaj člana';
+  document.getElementById('tm-cancel-btn').style.display = 'none';
+}
+
+async function handleSaveTeamMember(e) {
+  e.preventDefault();
+  const id = document.getElementById('tm-id').value;
+  const action = id ? 'update-member' : 'add-member';
+  try {
+    const data = await apiCall(`/admin/settings?action=${action}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        id: id || undefined,
+        name: document.getElementById('tm-name').value,
+        role: document.getElementById('tm-role').value,
+        bio: document.getElementById('tm-bio').value,
+        imageUrl: document.getElementById('tm-image').value,
+        link: document.getElementById('tm-link').value
+      })
+    });
+    showToast(id ? 'Član posodobljen.' : 'Član dodan.');
+    resetTeamForm();
+    renderTeamList(data.teamMembers || []);
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function deleteTeamMember(id) {
+  if (!confirm('Izbrišem tega člana?')) return;
+  try {
+    const data = await apiCall(`/admin/settings?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    showToast('Član izbrisan.');
+    renderTeamList(data.teamMembers || []);
   } catch (e) { showToast(e.message, true); }
 }
 

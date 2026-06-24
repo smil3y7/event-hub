@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { id, title, description, date, time, location, locationUrl, imageUrl, isOnline, published, colorTag, eventType } = req.body || {};
+    const { id, title, description, date, time, location, locationUrl, imageUrl, isOnline, published, colorTag, eventType, speakerName, speakerRole, speakerBio, speakerImageUrl, speakerLink } = req.body || {};
     if (!title) return err(res, 'Title is required');
 
     const eventId = id || randomUUID();
@@ -52,6 +52,11 @@ export default async function handler(req, res) {
       published: published !== false ? 'true' : 'false',
       colorTag: safeColor,
       eventType: safeType,
+      speakerName: (speakerName || '').trim().substring(0, 60),
+      speakerRole: (speakerRole || '').trim().substring(0, 60),
+      speakerBio: (speakerBio || '').trim().substring(0, 300),
+      speakerImageUrl: (speakerImageUrl || '').trim(),
+      speakerLink: (speakerLink || '').trim(),
       updatedAt: new Date().toISOString()
     };
     if (!isUpdate) fields.createdAt = new Date().toISOString();

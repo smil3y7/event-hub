@@ -8,9 +8,17 @@ function normalizeRecord(record) {
   if (!record) return record;
   const out = {};
   for (const [k, v] of Object.entries(record)) {
-    out[k] = v === null || v === undefined ? '' : String(v);
+    if (k === 'teamMembers') {
+      out[k] = v === null || v === undefined ? '[]' : String(v);
+    } else {
+      out[k] = v === null || v === undefined ? '' : String(v);
+    }
   }
   return out;
+}
+
+function parseTeamMembers(settings) {
+  try { return JSON.parse(settings?.teamMembers || '[]'); } catch { return []; }
 }
 
 export default async function handler(req, res) {
@@ -19,20 +27,20 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return err(res, 'Method not allowed', 405);
 
   const ids = await kv.smembers('events');
-  if (!ids || ids.length === 0) return ok(res, { events: [], settings: await getSettings(kv) });
+  const settings = await getSettings(kv);
+  const teamMembers = parseTeamMembers(settings);
+
+  if (!ids || ids.length === 0) return ok(res, { events: [], settings, teamMembers });
 
   const events = (await Promise.all(
     ids.map(id => kv.hgetall(`event:${id}`))
   )).filter(Boolean).map(normalizeRecord).sort((a, b) => {
-    // sort by date ascending (upcoming first), then by createdAt
     const da = a.date || a.createdAt || '';
     const db = b.date || b.createdAt || '';
     return da.localeCompare(db);
   });
 
-  const settings = await getSettings(kv);
-
-  return ok(res, { events, settings });
+  return ok(res, { events, settings, teamMembers });
 }
 
 async function getSettings(kv) {
@@ -41,6 +49,8 @@ async function getSettings(kv) {
     displayMode: 'single',
     siteTitle: 'Sentria Events',
     siteSubtitle: '',
-    collectName: 'true'
+    collectName: 'true',
+    heroText: '',
+    teamMembers: '[]'
   };
 }

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sentria Events</title>
+<script defer src="/_vercel/insights/script.js"></script>
 <style>
 :root {
   --bg: #0a0a12;
@@ -449,12 +450,120 @@ header p {
   font-size: 1rem;
 }
 
+/* ═══════════════════════════════════════
+   HERO SECTION
+═══════════════════════════════════════ */
+.hero-section {
+  max-width: 760px;
+  margin: 3rem auto 0;
+  padding: 0 1.5rem;
+  text-align: center;
+}
+.hero-section p {
+  font-size: 1.08rem;
+  line-height: 1.85;
+  color: var(--text2);
+  white-space: pre-line;
+}
+.hero-divider {
+  width: 40px; height: 1px;
+  background: var(--border);
+  margin: 2.5rem auto;
+}
+
+/* ═══════════════════════════════════════
+   TEAM SECTION
+═══════════════════════════════════════ */
+.team-section {
+  max-width: 860px;
+  margin: 0 auto 1rem;
+  padding: 0 1.5rem;
+}
+.team-section h2 {
+  font-size: 0.85rem;
+  font-family: var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.2rem;
+}
+.team-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.2rem;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.team-card:hover { border-color: var(--accent); }
+.team-card .member-img {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 1rem;
+  display: block;
+  border: 2px solid var(--border);
+}
+.team-card .member-img.placeholder {
+  background: var(--bg3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; color: var(--text3);
+  width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 1rem;
+}
+.team-card .member-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+.team-card .member-role {
+  font-size: 0.78rem;
+  font-family: var(--sans);
+  color: var(--accent2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+}
+.team-card .member-bio {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text2);
+  margin-bottom: 1rem;
+}
+.team-card .member-link {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+.team-card .member-link:hover { border-color: var(--accent); }
+
+/* ── FOOTER — fix: must clear sticky subscribe bar ── */
+.site-footer {
+  padding: 2rem 1.5rem 1.5rem;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text3);
+  border-top: 1px solid var(--border);
+  margin-top: 3rem;
+}
+
 @media (max-width: 600px) {
   header { padding: 2.5rem 1rem 1.5rem; }
   .mode-single .event-single { margin: 1.5rem auto; }
   .mode-series .timeline::before { left: calc(1rem + 20px); }
   .subscribe-bar-inner { flex-wrap: wrap; }
   .subscribe-bar .name-field { max-width: none; flex: 1 1 100%; order: -1; }
+  .team-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -467,11 +576,28 @@ header p {
     <p id="site-subtitle"></p>
   </header>
 
+  <!-- Hero text (only shown if heroText is set in settings) -->
+  <div class="hero-section" id="hero-section" style="display:none">
+    <p id="hero-text"></p>
+  </div>
+
+  <!-- Team section (only shown if team members exist) -->
+  <div id="team-section" style="display:none">
+    <div class="hero-divider"></div>
+    <div class="team-section">
+      <h2>Ekipa</h2>
+      <div class="team-grid" id="team-grid"></div>
+    </div>
+    <div class="hero-divider"></div>
+  </div>
+
   <main id="main">
     <div class="loader">Nalaganje...</div>
   </main>
 
-  <p id="footer-text" style="text-align:center; font-family:var(--sans); font-size:0.8rem; color:var(--text3); padding:2rem 1.5rem 0"></p>
+  <footer class="site-footer">
+    <p id="footer-text"></p>
+  </footer>
 </div>
 
 <!-- MODAL for event details (catalog/series click) -->
@@ -531,12 +657,28 @@ function eventBadges(ev, includePast) {
 }
 
 function eventDetailHtml(ev) {
+  const speakerHtml = ev.speakerName ? `
+    <div style="margin-top:1.8rem; padding-top:1.5rem; border-top:1px solid var(--border); display:flex; gap:1rem; align-items:flex-start">
+      ${ev.speakerImageUrl
+        ? `<img src="${ev.speakerImageUrl}" alt="${ev.speakerName}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" onerror="this.style.display='none'">`
+        : '<div style="width:56px;height:56px;border-radius:50%;background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:1.4rem">☽</div>'
+      }
+      <div>
+        <div style="font-size:0.78rem;font-family:var(--sans);text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:0.25rem">Predavatelj</div>
+        <div style="font-size:1rem;color:var(--text);margin-bottom:0.2rem">${ev.speakerName}</div>
+        ${ev.speakerRole ? `<div style="font-size:0.8rem;color:var(--accent2);font-family:var(--sans)">${ev.speakerRole}</div>` : ''}
+        ${ev.speakerBio ? `<p style="font-size:0.88rem;color:var(--text2);line-height:1.6;margin-top:0.5rem">${ev.speakerBio}</p>` : ''}
+        ${ev.speakerLink ? `<a href="${ev.speakerLink}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--accent);text-decoration:none;font-family:var(--sans);display:inline-block;margin-top:0.4rem">↗ Več o predavatelju</a>` : ''}
+      </div>
+    </div>` : '';
+
   return `
     ${renderImage(ev.imageUrl, 'event-image')}
     <div class="event-meta">${eventBadges(ev, false)}</div>
     <h2>${ev.title}</h2>
     <div class="desc">${ev.description || ''}</div>
     ${ev.locationUrl ? `<a class="location-link" href="${ev.locationUrl}" target="_blank" rel="noopener">↗ ${ev.isOnline === 'true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
+    ${speakerHtml}
   `;
 }
 
@@ -623,7 +765,7 @@ async function init() {
   try {
     const res = await fetch(`${API}/events`);
     const data = await res.json();
-    const { events = [], settings = {} } = data;
+    const { events = [], settings = {}, teamMembers = [] } = data;
 
     if (settings.siteTitle) {
       document.getElementById('site-title').textContent = settings.siteTitle;
@@ -631,8 +773,30 @@ async function init() {
     }
     if (settings.siteSubtitle) document.getElementById('site-subtitle').textContent = settings.siteSubtitle;
     if (settings.footerText) document.getElementById('footer-text').textContent = settings.footerText;
-
     if (settings.collectName === 'true') document.getElementById('subscribe-bar').classList.add('show-name');
+
+    // Hero text
+    if (settings.heroText) {
+      document.getElementById('hero-text').textContent = settings.heroText;
+      document.getElementById('hero-section').style.display = '';
+    }
+
+    // Team members
+    if (teamMembers.length > 0) {
+      document.getElementById('team-section').style.display = '';
+      document.getElementById('team-grid').innerHTML = teamMembers.map(m => `
+        <div class="team-card">
+          ${m.imageUrl
+            ? `<img class="member-img" src="${m.imageUrl}" alt="${m.name}" onerror="this.outerHTML='<div class=&quot;member-img placeholder&quot;>☽</div>'">`
+            : '<div class="member-img placeholder">☽</div>'
+          }
+          <div class="member-name">${m.name}</div>
+          ${m.role ? `<div class="member-role">${m.role}</div>` : ''}
+          ${m.bio ? `<p class="member-bio">${m.bio}</p>` : ''}
+          ${m.link ? `<a class="member-link" href="${m.link}" target="_blank" rel="noopener">↗ Več o meni</a>` : ''}
+        </div>
+      `).join('');
+    }
 
     const published = events.filter(e => e.published === 'true');
     allEvents = published;
