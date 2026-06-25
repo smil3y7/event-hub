@@ -3,15 +3,31 @@ import { kv } from '../_kv.js';
 import { cors, verifyJWT, ok, err } from '../_lib.js';
 import { randomUUID } from 'crypto';
 
-// Upstash auto-deserializes JSON-like hash values (e.g. "true" -> boolean true).
-// We always store/expect plain strings, so normalize every field back to string.
+// Normalize hash fields — Upstash auto-deserializes JSON-like values.
+// speakers is stored as JSON array string; if Upstash returns it as an object, re-stringify.
 function normalizeRecord(record) {
   if (!record) return record;
   const out = {};
   for (const [k, v] of Object.entries(record)) {
-    out[k] = v === null || v === undefined ? '' : String(v);
+    if (k === 'speakers') {
+      if (Array.isArray(v) || (typeof v === 'object' && v !== null)) {
+        out[k] = JSON.stringify(v);
+      } else {
+        out[k] = v === null || v === undefined ? '[]' : String(v);
+      }
+    } else {
+      out[k] = v === null || v === undefined ? '' : String(v);
+    }
   }
   return out;
+}
+
+function parseSpeakers(event) {
+  const v = event?.speakers;
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'object') return Object.values(v);
+  try { return JSON.parse(v); } catch { return []; }
 }
 
 export default async function handler(req, res) {
@@ -29,7 +45,8 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { id, title, description, date, time, location, locationUrl, imageUrl, isOnline, published, colorTag, eventType, speakerName, speakerRole, speakerBio, speakerImageUrl, speakerLink } = req.body || {};
+    const { id, title, description, date, time, location, locationUrl, imageUrl,
+            isOnline, published, colorTag, eventType, speakers } = req.body || {};
     if (!title) return err(res, 'Title is required');
 
     const eventId = id || randomUUID();
@@ -38,6 +55,16 @@ export default async function handler(req, res) {
     const ALLOWED_COLORS = ['oneiro-dark', 'forest-dream', 'ember-trance', 'void'];
     const safeColor = ALLOWED_COLORS.includes(colorTag) ? colorTag : 'oneiro-dark';
     const safeType = eventType === 'recurring' ? 'recurring' : 'single';
+
+    // Sanitize speakers array
+    const safeSpeakers = Array.isArray(speakers) ? speakers.map(s => ({
+      id: s.id || randomUUID(),
+      name: (s.name || '').trim().substring(0, 60),
+      role: (s.role || '').trim().substring(0, 60),
+      bio: (s.bio || '').trim().substring(0, 300),
+      imageUrl: (s.imageUrl || '').trim(),
+      link: (s.link || '').trim()
+    })).filter(s => s.name) : [];
 
     const fields = {
       id: eventId,
@@ -52,17 +79,12 @@ export default async function handler(req, res) {
       published: published !== false ? 'true' : 'false',
       colorTag: safeColor,
       eventType: safeType,
-      speakerName: (speakerName || '').trim().substring(0, 60),
-      speakerRole: (speakerRole || '').trim().substring(0, 60),
-      speakerBio: (speakerBio || '').trim().substring(0, 300),
-      speakerImageUrl: (speakerImageUrl || '').trim(),
-      speakerLink: (speakerLink || '').trim(),
+      speakers: JSON.stringify(safeSpeakers),
       updatedAt: new Date().toISOString()
     };
     if (!isUpdate) fields.createdAt = new Date().toISOString();
 
     await kv.hset(`event:${eventId}`, fields);
-
     if (!isUpdate) await kv.sadd('events', eventId);
     return ok(res, { id: eventId }, isUpdate ? 200 : 201);
   }

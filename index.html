@@ -454,22 +454,84 @@ header p {
    HERO SECTION
 ═══════════════════════════════════════ */
 .hero-section {
-  max-width: 760px;
+  max-width: 680px;
   margin: 3rem auto 0;
   padding: 0 1.5rem;
-  text-align: center;
 }
-.hero-section p {
-  font-size: 1.08rem;
+.hero-inner {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 1.6rem 2rem;
+  position: relative;
+}
+.hero-inner::before {
+  content: '✦';
+  position: absolute;
+  top: -0.7rem;
+  left: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--accent2);
+  background: var(--bg);
+  padding: 0 0.4rem;
+}
+.hero-inner p {
+  font-size: 1.05rem;
   line-height: 1.85;
   color: var(--text2);
   white-space: pre-line;
+  margin: 0;
 }
 .hero-divider {
   width: 40px; height: 1px;
   background: var(--border);
   margin: 2.5rem auto;
 }
+
+/* ── FILTER TABS ── */
+.filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 1.5rem 1.5rem 0;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.filter-tab {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.4em 1em;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-tab:hover { color: var(--text2); border-color: var(--text3); }
+.filter-tab.active { background: var(--card); color: var(--accent2); border-color: var(--accent2); }
+
+/* ── LOAD MORE ── */
+.load-more-wrap {
+  text-align: center;
+  padding: 1.5rem;
+}
+.load-more-btn {
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  color: var(--text2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.load-more-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ═══════════════════════════════════════
    TEAM SECTION
@@ -578,7 +640,9 @@ header p {
 
   <!-- Hero text (only shown if heroText is set in settings) -->
   <div class="hero-section" id="hero-section" style="display:none">
-    <p id="hero-text"></p>
+    <div class="hero-inner">
+      <p id="hero-text"></p>
+    </div>
   </div>
 
   <!-- Team section (only shown if team members exist) -->
@@ -589,6 +653,13 @@ header p {
       <div class="team-grid" id="team-grid"></div>
     </div>
     <div class="hero-divider"></div>
+  </div>
+
+  <!-- Filter tabs — shown after hero/team -->
+  <div class="filter-tabs" id="filter-tabs" style="display:none">
+    <button class="filter-tab active" data-filter="upcoming" onclick="setFilter('upcoming')">Prihajajoči</button>
+    <button class="filter-tab" data-filter="past" onclick="setFilter('past')">Pretekli</button>
+    <button class="filter-tab" data-filter="all" onclick="setFilter('all')">Vsi</button>
   </div>
 
   <main id="main">
@@ -621,6 +692,9 @@ header p {
 <script>
 const API = '/api';
 let allEvents = [];
+let currentFilter = 'upcoming'; // 'upcoming' | 'past' | 'all'
+const PAGE_SIZE = 6; // events per load-more batch
+let visibleCount = PAGE_SIZE;
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -656,20 +730,36 @@ function eventBadges(ev, includePast) {
   return badges.join('');
 }
 
-function eventDetailHtml(ev) {
-  const speakerHtml = ev.speakerName ? `
-    <div style="margin-top:1.8rem; padding-top:1.5rem; border-top:1px solid var(--border); display:flex; gap:1rem; align-items:flex-start">
-      ${ev.speakerImageUrl
-        ? `<img src="${ev.speakerImageUrl}" alt="${ev.speakerName}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" onerror="this.style.display='none'">`
-        : '<div style="width:56px;height:56px;border-radius:50%;background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:1.4rem">☽</div>'
+function parseSpeakers(ev) {
+  const v = ev.speakers;
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'object' && v !== null) return Object.values(v);
+  try { return JSON.parse(v); } catch { return []; }
+}
+
+function speakerCardHtml(s) {
+  return `
+    <div style="display:flex; gap:1rem; align-items:flex-start; margin-top:1.2rem">
+      ${s.imageUrl
+        ? `<img src="${s.imageUrl}" alt="${s.name}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" onerror="this.style.display='none'">`
+        : '<div style="width:52px;height:52px;border-radius:50%;background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:1.2rem">☽</div>'
       }
       <div>
-        <div style="font-size:0.78rem;font-family:var(--sans);text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:0.25rem">Predavatelj</div>
-        <div style="font-size:1rem;color:var(--text);margin-bottom:0.2rem">${ev.speakerName}</div>
-        ${ev.speakerRole ? `<div style="font-size:0.8rem;color:var(--accent2);font-family:var(--sans)">${ev.speakerRole}</div>` : ''}
-        ${ev.speakerBio ? `<p style="font-size:0.88rem;color:var(--text2);line-height:1.6;margin-top:0.5rem">${ev.speakerBio}</p>` : ''}
-        ${ev.speakerLink ? `<a href="${ev.speakerLink}" target="_blank" rel="noopener" style="font-size:0.82rem;color:var(--accent);text-decoration:none;font-family:var(--sans);display:inline-block;margin-top:0.4rem">↗ Več o predavatelju</a>` : ''}
+        <div style="font-size:0.95rem;color:var(--text)">${s.name}</div>
+        ${s.role ? `<div style="font-size:0.78rem;color:var(--accent2);font-family:var(--sans);margin-bottom:0.3rem">${s.role}</div>` : ''}
+        ${s.bio ? `<p style="font-size:0.86rem;color:var(--text2);line-height:1.6;margin:0">${s.bio}</p>` : ''}
+        ${s.link ? `<a href="${s.link}" target="_blank" rel="noopener" style="font-size:0.8rem;color:var(--accent);text-decoration:none;font-family:var(--sans);display:inline-block;margin-top:0.3rem">↗ Več</a>` : ''}
       </div>
+    </div>`;
+}
+
+function eventDetailHtml(ev) {
+  const speakers = parseSpeakers(ev);
+  const speakersHtml = speakers.length ? `
+    <div style="margin-top:1.8rem; padding-top:1.5rem; border-top:1px solid var(--border)">
+      <div style="font-size:0.78rem;font-family:var(--sans);text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:0.6rem">${speakers.length === 1 ? 'Predavatelj' : 'Predavatelji'}</div>
+      ${speakers.map(speakerCardHtml).join('')}
     </div>` : '';
 
   return `
@@ -678,7 +768,7 @@ function eventDetailHtml(ev) {
     <h2>${ev.title}</h2>
     <div class="desc">${ev.description || ''}</div>
     ${ev.locationUrl ? `<a class="location-link" href="${ev.locationUrl}" target="_blank" rel="noopener">↗ ${ev.isOnline === 'true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
-    ${speakerHtml}
+    ${speakersHtml}
   `;
 }
 
@@ -761,6 +851,8 @@ function renderSeries(upcoming, past) {
   return html;
 }
 
+let displayMode = 'single';
+
 async function init() {
   try {
     const res = await fetch(`${API}/events`);
@@ -775,13 +867,11 @@ async function init() {
     if (settings.footerText) document.getElementById('footer-text').textContent = settings.footerText;
     if (settings.collectName === 'true') document.getElementById('subscribe-bar').classList.add('show-name');
 
-    // Hero text
     if (settings.heroText) {
       document.getElementById('hero-text').textContent = settings.heroText;
       document.getElementById('hero-section').style.display = '';
     }
 
-    // Team members
     if (teamMembers.length > 0) {
       document.getElementById('team-section').style.display = '';
       document.getElementById('team-grid').innerHTML = teamMembers.map(m => `
@@ -793,6 +883,7 @@ async function init() {
           <div class="member-name">${m.name}</div>
           ${m.role ? `<div class="member-role">${m.role}</div>` : ''}
           ${m.bio ? `<p class="member-bio">${m.bio}</p>` : ''}
+          ${m.contact ? `<p style="font-family:var(--sans);font-size:0.82rem;color:var(--text3);margin-bottom:0.4rem">✉ ${m.contact}</p>` : ''}
           ${m.link ? `<a class="member-link" href="${m.link}" target="_blank" rel="noopener">↗ Več o meni</a>` : ''}
         </div>
       `).join('');
@@ -800,20 +891,74 @@ async function init() {
 
     const published = events.filter(e => e.published === 'true');
     allEvents = published;
-    const upcoming = published.filter(e => isUpcoming(e.date)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    const past = published.filter(e => !isUpcoming(e.date)).sort((a, b) => (b.date || '').localeCompare(a.date || '')); // most recent past first
+    displayMode = settings.displayMode || 'single';
+    document.getElementById('main').className = `mode-${displayMode}`;
 
-    const mode = settings.displayMode || 'single';
-    const main = document.getElementById('main');
-    main.className = `mode-${mode}`;
+    // Show filter tabs only when there's something to filter
+    const hasPast = published.some(e => !isUpcoming(e.date));
+    const hasUpcoming = published.some(e => isUpcoming(e.date));
+    if (hasPast && hasUpcoming) {
+      document.getElementById('filter-tabs').style.display = '';
+    }
 
-    if (mode === 'single') main.innerHTML = renderSingle(upcoming, past);
-    else if (mode === 'catalog') main.innerHTML = renderCatalog(upcoming, past);
-    else if (mode === 'series') main.innerHTML = renderSeries(upcoming, past);
+    renderMain();
 
   } catch (e) {
     document.getElementById('main').innerHTML = `<div class="empty-state"><div class="symbol">!</div><p>Napaka pri nalaganju.</p></div>`;
   }
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  visibleCount = PAGE_SIZE;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.toggle('active', t.dataset.filter === filter));
+  renderMain();
+}
+
+function getFilteredEvents() {
+  if (currentFilter === 'upcoming') return { upcoming: allEvents.filter(e => isUpcoming(e.date)).sort((a, b) => (a.date||'').localeCompare(b.date||'')), past: [] };
+  if (currentFilter === 'past') return { upcoming: [], past: allEvents.filter(e => !isUpcoming(e.date)).sort((a, b) => (b.date||'').localeCompare(a.date||'')) };
+  // 'all'
+  return {
+    upcoming: allEvents.filter(e => isUpcoming(e.date)).sort((a, b) => (a.date||'').localeCompare(b.date||'')),
+    past: allEvents.filter(e => !isUpcoming(e.date)).sort((a, b) => (b.date||'').localeCompare(a.date||''))
+  };
+}
+
+function renderMain() {
+  const main = document.getElementById('main');
+  const { upcoming, past } = getFilteredEvents();
+  const total = upcoming.length + past.length;
+
+  // Apply load-more: for single mode show all (they're stacked naturally);
+  // for catalog/series limit by visibleCount across combined upcoming+past.
+  let upcomingSlice = upcoming;
+  let pastSlice = past;
+  let showLoadMore = false;
+
+  if (displayMode !== 'single') {
+    const combined = [...upcoming, ...past];
+    const visible = combined.slice(0, visibleCount);
+    upcomingSlice = visible.filter(e => isUpcoming(e.date));
+    pastSlice = visible.filter(e => !isUpcoming(e.date));
+    showLoadMore = total > visibleCount;
+  }
+
+  if (displayMode === 'single') main.innerHTML = renderSingle(upcomingSlice, pastSlice);
+  else if (displayMode === 'catalog') main.innerHTML = renderCatalog(upcomingSlice, pastSlice);
+  else if (displayMode === 'series') main.innerHTML = renderSeries(upcomingSlice, pastSlice);
+
+  if (showLoadMore) {
+    const btn = document.createElement('div');
+    btn.className = 'load-more-wrap';
+    btn.innerHTML = `<button class="load-more-btn" onclick="loadMore()">Prikaži več (${total - visibleCount} preostankov)</button>`;
+    main.appendChild(btn);
+  }
+}
+
+function loadMore() {
+  visibleCount += PAGE_SIZE;
+  renderMain();
 }
 
 async function handleSubscribe(e) {

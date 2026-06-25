@@ -4,12 +4,19 @@ import { cors, ok, err } from './_lib.js';
 
 // Upstash auto-deserializes JSON-like hash values (e.g. "true" -> boolean true).
 // We always store/expect plain strings, so normalize every field back to string.
+// Special case: teamMembers and speakers are JSON arrays — Upstash deserializes them
+// to actual JS arrays, so we re-stringify them instead of using String() which would
+// produce "[object Object]".
 function normalizeRecord(record) {
   if (!record) return record;
   const out = {};
   for (const [k, v] of Object.entries(record)) {
-    if (k === 'teamMembers') {
-      out[k] = v === null || v === undefined ? '[]' : String(v);
+    if (k === 'teamMembers' || k === 'speakers') {
+      if (Array.isArray(v) || (typeof v === 'object' && v !== null)) {
+        out[k] = JSON.stringify(v);
+      } else {
+        out[k] = v === null || v === undefined ? '[]' : String(v);
+      }
     } else {
       out[k] = v === null || v === undefined ? '' : String(v);
     }
@@ -18,7 +25,11 @@ function normalizeRecord(record) {
 }
 
 function parseTeamMembers(settings) {
-  try { return JSON.parse(settings?.teamMembers || '[]'); } catch { return []; }
+  const v = settings?.teamMembers;
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'object') return Object.values(v);
+  try { return JSON.parse(v); } catch { return []; }
 }
 
 export default async function handler(req, res) {

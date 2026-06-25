@@ -166,6 +166,29 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 .badge-mc { color: var(--accent2); font-size: 0.72rem; margin-left: 0.5rem; }
 
 .empty-hint { color: var(--text3); font-size: 0.88rem; text-align: center; padding: 2rem 0; font-style: italic; }
+
+.speaker-row {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin-bottom: 0.8rem; position: relative;
+}
+.speaker-row .remove-speaker {
+  position: absolute; top: 0.6rem; right: 0.6rem;
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text3); width: 26px; height: 26px; cursor: pointer; font-size: 0.8rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.speaker-row .remove-speaker:hover { border-color: var(--danger); color: var(--danger); }
+.speaker-row .speaker-upload-row {
+  display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem;
+}
+.speaker-row .speaker-upload-row input[type="file"] { font-size: 0.8rem; flex: 1; }
+.speaker-row .sp-status { font-size: 0.75rem; color: var(--text3); }
+.speaker-row .sp-preview { margin-top: 0.4rem; }
+.speaker-row .sp-preview img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); }
+
+.char-counter { font-size: 0.75rem; color: var(--text3); text-align: right; margin-top: 0.25rem; }
+.char-counter.warn { color: var(--accent2); }
+.char-counter.error { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -305,33 +328,16 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
             <input type="checkbox" id="ev-published" checked>
             <label for="ev-published">Objavljeno (vidno na javni strani)</label>
           </div>
+
+          <!-- Multi-speaker manager -->
           <div style="border-top:1px solid var(--border); margin:1rem 0; padding-top:1rem">
-            <p style="color:var(--text3); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:1rem">Predavatelj / gost (neobvezno)</p>
-            <div class="row">
-              <div class="field">
-                <label>Ime</label>
-                <input type="text" id="ev-speaker-name" placeholder="npr. Jana Novak">
-              </div>
-              <div class="field">
-                <label>Vloga / naziv</label>
-                <input type="text" id="ev-speaker-role" placeholder="npr. Šamanka, terapevtka">
-              </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem">
+              <p style="color:var(--text3); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.06em">Predavatelji / gostje (neobvezno)</p>
+              <button type="button" class="btn secondary small" onclick="addSpeakerRow()">+ Dodaj</button>
             </div>
-            <div class="field">
-              <label>Kratka predstavitev</label>
-              <textarea id="ev-speaker-bio" placeholder="Kratko o predavatelju..." style="min-height:60px"></textarea>
-            </div>
-            <div class="row">
-              <div class="field">
-                <label>Slika predavatelja (URL)</label>
-                <input type="url" id="ev-speaker-image" placeholder="https://...">
-              </div>
-              <div class="field">
-                <label>Spletna stran / link</label>
-                <input type="url" id="ev-speaker-link" placeholder="https://...">
-              </div>
-            </div>
+            <div id="speakers-list"></div>
           </div>
+
           <div style="display:flex; gap:0.6rem">
             <button class="btn" type="submit" id="ev-save-btn">Shrani dogodek</button>
             <button class="btn secondary" type="button" id="ev-cancel-btn" onclick="resetEventForm()" style="display:none">Prekliči urejanje</button>
@@ -385,7 +391,8 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
         </div>
         <div class="field">
           <label>Hero besedilo (opis namena strani, prikazan pod headerjem)</label>
-          <textarea id="set-hero" style="min-height:90px" placeholder="Kratko opiši, čemu je stran namenjena, koga vabite, kaj ponujate..."></textarea>
+          <textarea id="set-hero" style="min-height:90px" placeholder="Kratko opiši, čemu je stran namenjena, koga vabite, kaj ponujate..." oninput="updateHeroCounter(this)"></textarea>
+          <div class="char-counter" id="hero-counter">0 / 3000</div>
         </div>
         <div class="checkbox-field">
           <input type="checkbox" id="set-collectname">
@@ -417,14 +424,23 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
             <label>Kratka predstavitev</label>
             <textarea id="tm-bio" style="min-height:60px"></textarea>
           </div>
-          <div class="row">
-            <div class="field">
-              <label>Slika (URL)</label>
-              <input type="url" id="tm-image" placeholder="https://...">
+          <div class="field">
+            <label>Slika člana</label>
+            <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.4rem">
+              <input type="file" id="tm-image-file" accept="image/jpeg,image/png,image/webp" style="flex:1; font-size:0.82rem" onchange="handleMemberImageUpload(event)">
+              <span id="tm-upload-status" class="sp-status"></span>
             </div>
+            <input type="url" id="tm-image" placeholder="...ali prilepi URL slike">
+            <div id="tm-image-preview" style="margin-top:0.5rem"></div>
+          </div>
+          <div class="row">
             <div class="field">
               <label>Spletna stran / link</label>
               <input type="url" id="tm-link" placeholder="https://...">
+            </div>
+            <div class="field">
+              <label>Kontakt (e-mail ali telefon)</label>
+              <input type="text" id="tm-contact" placeholder="npr. jana@primer.si">
             </div>
           </div>
           <div style="display:flex; gap:0.6rem">
@@ -758,16 +774,127 @@ async function handleImageUpload(e) {
   }
 }
 
-function showImagePreview(url) {
-  const el = document.getElementById('image-preview');
+function showImagePreview(url, targetId = 'image-preview') {
+  const el = document.getElementById(targetId);
+  if (!el) return;
   if (!url) { el.innerHTML = ''; return; }
   el.innerHTML = `<img src="${url}" style="max-width:200px; max-height:160px; border-radius:8px; border:1px solid var(--border)" onerror="this.style.display='none'">`;
+}
+
+// Generic Blob upload: resizes, uploads, sets value on targetInputId, shows preview in targetPreviewId
+async function uploadImageToBlob(file, targetInputId, previewId, statusId) {
+  const status = document.getElementById(statusId);
+  if (file.size > 10 * 1024 * 1024) {
+    if (status) { status.textContent = 'Datoteka prevelika (max 10MB)'; status.style.color = 'var(--danger)'; }
+    return;
+  }
+  if (status) { status.textContent = 'Obdelujem...'; status.style.color = 'var(--text3)'; }
+  try {
+    const resized = await resizeImageFile(file, 800, 0.82); // smaller for avatars
+    if (status) status.textContent = 'Nalagam...';
+    const res = await fetch(`${API}/admin/upload-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/jpeg', 'Authorization': `Bearer ${token}` },
+      body: resized
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Napaka');
+    if (targetInputId) document.getElementById(targetInputId).value = data.url;
+    if (previewId) showImagePreview(data.url, previewId);
+    if (status) { status.textContent = `✓ Naloženo`; status.style.color = 'var(--accent2)'; }
+    return data.url;
+  } catch (e) {
+    if (status) { status.textContent = 'Napaka: ' + e.message; status.style.color = 'var(--danger)'; }
+    showToast(e.message, true);
+  }
 }
 
 let currentEventColor = 'oneiro-dark';
 function selectEventColor(color) {
   currentEventColor = color;
   document.querySelectorAll('#ev-color-picker .color-tag-opt').forEach(el => el.classList.toggle('selected', el.dataset.color === color));
+}
+
+/* ── SPEAKER ROWS (multi-speaker) ── */
+let speakerRows = []; // array of { id, name, role, bio, imageUrl, link }
+let speakerRowCounter = 0;
+
+function addSpeakerRow(data = {}) {
+  const rid = ++speakerRowCounter;
+  speakerRows.push({ _rid: rid, ...data });
+  renderSpeakerRows();
+}
+
+function removeSpeakerRow(rid) {
+  speakerRows = speakerRows.filter(s => s._rid !== rid);
+  renderSpeakerRows();
+}
+
+function renderSpeakerRows() {
+  const el = document.getElementById('speakers-list');
+  if (!speakerRows.length) {
+    el.innerHTML = '<p class="empty-hint" style="padding:0.5rem 0">Ni predavateljev. Klikni + Dodaj.</p>';
+    return;
+  }
+  el.innerHTML = speakerRows.map(s => `
+    <div class="speaker-row" data-rid="${s._rid}">
+      <button type="button" class="remove-speaker" onclick="removeSpeakerRow(${s._rid})">✕</button>
+      <div class="row" style="margin-bottom:0.5rem">
+        <div class="field">
+          <label style="font-size:0.78rem">Ime *</label>
+          <input type="text" class="sp-name" placeholder="Ime predavatelja" value="${s.name || ''}" required>
+        </div>
+        <div class="field">
+          <label style="font-size:0.78rem">Vloga</label>
+          <input type="text" class="sp-role" placeholder="npr. Šamanka" value="${s.role || ''}">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0.5rem">
+        <label style="font-size:0.78rem">Kratka predstavitev</label>
+        <textarea class="sp-bio" style="min-height:50px">${s.bio || ''}</textarea>
+      </div>
+      <div class="speaker-upload-row">
+        <input type="file" class="sp-file" accept="image/jpeg,image/png,image/webp" onchange="handleSpeakerImageUpload(event, ${s._rid})">
+        <span class="sp-status" id="sp-status-${s._rid}"></span>
+      </div>
+      <input type="url" class="sp-image-url" placeholder="...ali URL slike" value="${s.imageUrl || ''}" style="width:100%; margin-bottom:0.4rem">
+      <div class="sp-preview" id="sp-preview-${s._rid}">
+        ${s.imageUrl ? `<img src="${s.imageUrl}" onerror="this.style.display='none'">` : ''}
+      </div>
+      <div class="field" style="margin-top:0.4rem">
+        <input type="url" class="sp-link" placeholder="Spletna stran / link" value="${s.link || ''}">
+      </div>
+    </div>
+  `).join('');
+}
+
+async function handleSpeakerImageUpload(e, rid) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const row = speakerRows.find(s => s._rid === rid);
+  if (!row) return;
+  const url = await uploadImageToBlob(file, null, `sp-preview-${rid}`, `sp-status-${rid}`);
+  if (url) {
+    row.imageUrl = url;
+    // update the URL input in this row
+    const rowEl = document.querySelector(`.speaker-row[data-rid="${rid}"] .sp-image-url`);
+    if (rowEl) rowEl.value = url;
+  }
+}
+
+function collectSpeakers() {
+  return Array.from(document.querySelectorAll('.speaker-row')).map(row => {
+    const rid = parseInt(row.dataset.rid);
+    const stored = speakerRows.find(s => s._rid === rid) || {};
+    return {
+      id: stored.id || undefined,
+      name: row.querySelector('.sp-name')?.value.trim() || '',
+      role: row.querySelector('.sp-role')?.value.trim() || '',
+      bio: row.querySelector('.sp-bio')?.value.trim() || '',
+      imageUrl: row.querySelector('.sp-image-url')?.value.trim() || stored.imageUrl || '',
+      link: row.querySelector('.sp-link')?.value.trim() || ''
+    };
+  }).filter(s => s.name);
 }
 
 function editEvent(ev) {
@@ -784,11 +911,17 @@ function editEvent(ev) {
   document.getElementById('ev-eventtype').value = ev.eventType === 'recurring' ? 'recurring' : 'single';
   selectEventColor(ev.colorTag || 'oneiro-dark');
   document.getElementById('ev-published').checked = ev.published === 'true';
-  document.getElementById('ev-speaker-name').value = ev.speakerName || '';
-  document.getElementById('ev-speaker-role').value = ev.speakerRole || '';
-  document.getElementById('ev-speaker-bio').value = ev.speakerBio || '';
-  document.getElementById('ev-speaker-image').value = ev.speakerImageUrl || '';
-  document.getElementById('ev-speaker-link').value = ev.speakerLink || '';
+  // load speakers
+  speakerRows = [];
+  speakerRowCounter = 0;
+  let parsedSpeakers = [];
+  try {
+    const v = ev.speakers;
+    if (Array.isArray(v)) parsedSpeakers = v;
+    else if (typeof v === 'string' && v) parsedSpeakers = JSON.parse(v);
+  } catch {}
+  parsedSpeakers.forEach(s => addSpeakerRow(s));
+  if (!parsedSpeakers.length) renderSpeakerRows(); // show empty hint
   document.getElementById('event-form-title').textContent = 'Uredi dogodek';
   document.getElementById('ev-save-btn').textContent = 'Posodobi dogodek';
   document.getElementById('ev-cancel-btn').style.display = 'inline-flex';
@@ -807,6 +940,8 @@ function resetEventForm() {
   document.getElementById('upload-status').textContent = '';
   showImagePreview('');
   selectEventColor('oneiro-dark');
+  speakerRows = []; speakerRowCounter = 0;
+  renderSpeakerRows();
   toggleLocationLabel();
 }
 
@@ -825,11 +960,7 @@ async function handleSaveEvent(e) {
     eventType: document.getElementById('ev-eventtype').value,
     colorTag: currentEventColor,
     published: document.getElementById('ev-published').checked,
-    speakerName: document.getElementById('ev-speaker-name').value.trim(),
-    speakerRole: document.getElementById('ev-speaker-role').value.trim(),
-    speakerBio: document.getElementById('ev-speaker-bio').value.trim(),
-    speakerImageUrl: document.getElementById('ev-speaker-image').value.trim(),
-    speakerLink: document.getElementById('ev-speaker-link').value.trim()
+    speakers: collectSpeakers()
   };
   try {
     await apiCall('/admin/events', { method: 'POST', body: JSON.stringify(payload) });
@@ -848,6 +979,23 @@ async function deleteEvent(id) {
   } catch (e) { showToast(e.message, true); }
 }
 
+/* ── HERO COUNTER ── */
+function updateHeroCounter(el) {
+  const max = 3000;
+  const len = el.value.length;
+  const counter = document.getElementById('hero-counter');
+  if (!counter) return;
+  counter.textContent = `${len} / ${max}`;
+  counter.className = 'char-counter' + (len > max * 0.9 ? (len >= max ? ' error' : ' warn') : '');
+}
+
+/* ── MEMBER IMAGE UPLOAD ── */
+async function handleMemberImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  await uploadImageToBlob(file, 'tm-image', 'tm-image-preview', 'tm-upload-status');
+}
+
 /* ── SETTINGS ── */
 async function loadSettings() {
   try {
@@ -859,6 +1007,7 @@ async function loadSettings() {
     document.getElementById('set-title').value = s.siteTitle || '';
     document.getElementById('set-subtitle').value = s.siteSubtitle || '';
     document.getElementById('set-hero').value = s.heroText || '';
+    updateHeroCounter(document.getElementById('set-hero'));
     document.getElementById('set-collectname').checked = s.collectName !== 'false';
     document.getElementById('set-footer').value = s.footerText || '';
     renderTeamList(members);
@@ -914,6 +1063,8 @@ function editTeamMember(m) {
   document.getElementById('tm-bio').value = m.bio || '';
   document.getElementById('tm-image').value = m.imageUrl || '';
   document.getElementById('tm-link').value = m.link || '';
+  document.getElementById('tm-contact').value = m.contact || '';
+  showImagePreview(m.imageUrl || '', 'tm-image-preview');
   document.getElementById('tm-save-btn').textContent = 'Posodobi člana';
   document.getElementById('tm-cancel-btn').style.display = 'inline-flex';
 }
@@ -923,6 +1074,8 @@ function resetTeamForm() {
   document.getElementById('tm-id').value = '';
   document.getElementById('tm-save-btn').textContent = 'Dodaj člana';
   document.getElementById('tm-cancel-btn').style.display = 'none';
+  document.getElementById('tm-upload-status').textContent = '';
+  showImagePreview('', 'tm-image-preview');
 }
 
 async function handleSaveTeamMember(e) {
@@ -938,7 +1091,8 @@ async function handleSaveTeamMember(e) {
         role: document.getElementById('tm-role').value,
         bio: document.getElementById('tm-bio').value,
         imageUrl: document.getElementById('tm-image').value,
-        link: document.getElementById('tm-link').value
+        link: document.getElementById('tm-link').value,
+        contact: document.getElementById('tm-contact').value
       })
     });
     showToast(id ? 'Član posodobljen.' : 'Član dodan.');
@@ -1088,6 +1242,7 @@ function exportCsv() {
 /* ── INIT ── */
 if (token) { enterApp(); } else { document.getElementById('login-screen').style.display = 'flex'; }
 toggleLocationLabel();
+renderSpeakerRows(); // show empty hint on load
 </script>
 </body>
 </html>
