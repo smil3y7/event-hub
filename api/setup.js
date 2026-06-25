@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   // Seed default settings (colorTheme is now per-event, not global)
   await kv.hset('settings', {
     displayMode: 'single',
-    siteTitle: 'Events',
+    siteTitle: 'LD Events',
     siteSubtitle: 'Prebudi se v svoje sanje',
     collectName: 'true',
     footerText: ''
