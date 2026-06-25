@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sentria Events</title>
+<title>Events</title>
 <script defer src="/_vercel/insights/script.js"></script>
 <style>
 :root {
@@ -441,6 +441,23 @@ header p {
 .bar-msg.ok { color: var(--accent2); }
 .bar-msg.error { color: #e06060; }
 
+/* ── BACK TO TOP ── */
+.back-to-top {
+  position: fixed;
+  bottom: 6rem; right: 1.2rem;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 1rem; z-index: 99;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s, border-color 0.2s, color 0.2s;
+}
+.back-to-top.visible { opacity: 0.8; pointer-events: auto; }
+.back-to-top:hover { opacity: 1; border-color: var(--accent); color: var(--accent); }
+
 /* ── LOADER ── */
 .loader {
   display: flex; align-items: center; justify-content: center;
@@ -634,7 +651,7 @@ header p {
   <header>
     <a href="/admin.html" class="admin-link" title="Admin">⬡</a>
     <span class="header-star" id="header-star">✦ ✦ ✦</span>
-    <h1 id="site-title">Sentria Events</h1>
+    <h1 id="site-title">Events</h1>
     <p id="site-subtitle"></p>
   </header>
 
@@ -657,9 +674,6 @@ header p {
 
   <!-- Filter tabs — shown after hero/team -->
   <div id="filter-tabs-wrap" style="display:none">
-    <div style="max-width:1100px; margin:2.5rem auto 0; padding:0 1.5rem">
-      <h2 style="font-family:var(--sans); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--text3); margin-bottom:1rem">Dogodki</h2>
-    </div>
     <div class="filter-tabs" id="filter-tabs">
       <button class="filter-tab active" data-filter="upcoming" onclick="setFilter('upcoming')">Prihajajoči</button>
       <button class="filter-tab" data-filter="past" onclick="setFilter('past')">Pretekli</button>
@@ -675,6 +689,9 @@ header p {
     <p id="footer-text"></p>
   </footer>
 </div>
+
+<!-- BACK TO TOP -->
+<button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Na vrh">↑</button>
 
 <!-- MODAL for event details (catalog/series click) -->
 <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this) closeModal()">
@@ -797,6 +814,7 @@ function renderSingle(upcoming, past) {
   }
   let html = '';
   if (upcoming.length) {
+    if (past.length) html += `<div class="section-divider" style="max-width:680px"><h2>Aktualni dogodki</h2></div>`;
     html += upcoming.map(ev => `<div class="event-single" data-event-theme="${ev.colorTag || 'oneiro-dark'}">${eventDetailHtml(ev)}</div>`).join('');
   } else {
     html += `<div class="empty-state"><div class="symbol">☽</div><p>Ni napovedanih prihodnjih dogodkov.</p></div>`;
@@ -823,8 +841,12 @@ function renderCatalogGroup(events, isPast) {
 function renderCatalog(upcoming, past) {
   if (!upcoming.length && !past.length) return `<div class="empty-state"><div class="symbol">☽</div><p>Ni objavljenih dogodkov.</p></div>`;
   let html = '';
-  if (upcoming.length) html += renderCatalogGroup(upcoming, false);
-  else html += `<div class="empty-state"><div class="symbol">☽</div><p>Ni napovedanih prihodnjih dogodkov.</p></div>`;
+  if (upcoming.length) {
+    if (past.length) html += `<div class="section-divider"><h2>Aktualni dogodki</h2></div>`;
+    html += renderCatalogGroup(upcoming, false);
+  } else {
+    html += `<div class="empty-state"><div class="symbol">☽</div><p>Ni napovedanih prihodnjih dogodkov.</p></div>`;
+  }
   if (past.length) {
     html += `<div class="section-divider"><h2>Pretekli dogodki</h2></div>`;
     html += renderCatalogGroup(past, true);
@@ -847,8 +869,12 @@ function renderSeriesGroup(events, isPast) {
 function renderSeries(upcoming, past) {
   if (!upcoming.length && !past.length) return `<div class="empty-state"><div class="symbol">☽</div><p>Ni objavljenih dogodkov v seriji.</p></div>`;
   let html = '';
-  if (upcoming.length) html += renderSeriesGroup(upcoming, false);
-  else html += `<div class="empty-state"><div class="symbol">☽</div><p>Ni napovedanih prihodnjih dogodkov.</p></div>`;
+  if (upcoming.length) {
+    if (past.length) html += `<div class="section-divider" style="max-width:720px"><h2>Aktualni dogodki</h2></div>`;
+    html += renderSeriesGroup(upcoming, false);
+  } else {
+    html += `<div class="empty-state"><div class="symbol">☽</div><p>Ni napovedanih prihodnjih dogodkov.</p></div>`;
+  }
   if (past.length) {
     html += `<div class="section-divider" style="max-width:720px"><h2>Pretekli dogodki</h2></div>`;
     html += renderSeriesGroup(past, true);
@@ -1000,6 +1026,12 @@ async function handleSubscribe(e) {
     setTimeout(() => { msg.style.display = 'none'; }, 4000);
   }
 }
+
+// Back to top visibility
+window.addEventListener('scroll', () => {
+  const btn = document.getElementById('back-to-top');
+  if (btn) btn.classList.toggle('visible', window.scrollY > 400);
+}, { passive: true });
 
 init();
 </script>

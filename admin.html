@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sentria — Admin</title>
+<title>Admin</title>
 <script defer src="/_vercel/insights/script.js"></script>
 <style>
 :root {
@@ -196,7 +196,7 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 <!-- ═══════════ LOGIN SCREEN ═══════════ -->
 <div class="login-wrap" id="login-screen">
   <div class="login-box">
-    <h1>✦ Sentria Admin</h1>
+    <h1>✦ Admin</h1>
     <p class="sub">Prijava v nadzorno ploščo</p>
     <form id="login-form" onsubmit="handleLogin(event)">
       <div class="field">
@@ -241,7 +241,7 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 <!-- ═══════════ MAIN APP ═══════════ -->
 <div class="app" id="app">
   <header class="topbar">
-    <h1>✦ Sentria Admin</h1>
+    <h1>✦ Admin</h1>
     <div class="actions">
       <span class="who" id="who-label"></span>
       <button class="btn secondary small" onclick="logout()">Odjava</button>
@@ -522,9 +522,9 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 
 <script>
 const API = '/api';
-let token = localStorage.getItem('sentria_token') || null;
-let userRole = localStorage.getItem('sentria_role') || null;
-let username = localStorage.getItem('sentria_username') || null;
+let token = localStorage.getItem('ev_token') || null;
+let userRole = localStorage.getItem('ev_role') || null;
+let username = localStorage.getItem('ev_username') || null;
 let pendingMustChange = null; // holds {username,password,token,role} during forced change flow
 let currentMode = 'single';
 
@@ -577,9 +577,9 @@ async function handleLogin(e) {
     }
 
     token = data.token; userRole = data.role; username = data.username;
-    localStorage.setItem('sentria_token', token);
-    localStorage.setItem('sentria_role', userRole);
-    localStorage.setItem('sentria_username', username);
+    localStorage.setItem('ev_token', token);
+    localStorage.setItem('ev_role', userRole);
+    localStorage.setItem('ev_username', username);
     enterApp();
   } catch {
     err.textContent = 'Napaka pri povezavi.';
@@ -606,9 +606,9 @@ async function handleForcedPasswordChange(e) {
     if (!data.ok) { err.textContent = data.error || 'Napaka pri menjavi gesla.'; btn.disabled = false; return; }
 
     token = pendingMustChange.token; userRole = pendingMustChange.role; username = pendingMustChange.username;
-    localStorage.setItem('sentria_token', token);
-    localStorage.setItem('sentria_role', userRole);
-    localStorage.setItem('sentria_username', username);
+    localStorage.setItem('ev_token', token);
+    localStorage.setItem('ev_role', userRole);
+    localStorage.setItem('ev_username', username);
     document.getElementById('change-pw-screen').style.display = 'none';
     enterApp();
     showToast('Geslo uspešno nastavljeno.');
@@ -619,9 +619,9 @@ async function handleForcedPasswordChange(e) {
 }
 
 function logout() {
-  localStorage.removeItem('sentria_token');
-  localStorage.removeItem('sentria_role');
-  localStorage.removeItem('sentria_username');
+  localStorage.removeItem('ev_token');
+  localStorage.removeItem('ev_role');
+  localStorage.removeItem('ev_username');
   token = null; userRole = null; username = null;
   document.getElementById('app').classList.remove('active');
   document.getElementById('login-screen').style.display = 'flex';
