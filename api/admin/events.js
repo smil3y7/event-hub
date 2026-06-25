@@ -61,7 +61,7 @@ export default async function handler(req, res) {
       id: s.id || randomUUID(),
       name: (s.name || '').trim().substring(0, 60),
       role: (s.role || '').trim().substring(0, 60),
-      bio: (s.bio || '').trim().substring(0, 300),
+      bio: (s.bio || '').trim().substring(0, 2000),
       imageUrl: (s.imageUrl || '').trim(),
       link: (s.link || '').trim()
     })).filter(s => s.name) : [];

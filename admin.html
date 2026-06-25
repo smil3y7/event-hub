@@ -819,13 +819,29 @@ function selectEventColor(color) {
 let speakerRows = []; // array of { id, name, role, bio, imageUrl, link }
 let speakerRowCounter = 0;
 
+function syncSpeakerRowsFromDOM() {
+  document.querySelectorAll('.speaker-row').forEach(row => {
+    const rid = parseInt(row.dataset.rid);
+    const entry = speakerRows.find(s => s._rid === rid);
+    if (!entry) return;
+    entry.name = row.querySelector('.sp-name')?.value || '';
+    entry.role = row.querySelector('.sp-role')?.value || '';
+    entry.bio = row.querySelector('.sp-bio')?.value || '';
+    entry.link = row.querySelector('.sp-link')?.value || '';
+    const urlInput = row.querySelector('.sp-image-url');
+    if (urlInput?.value) entry.imageUrl = urlInput.value;
+  });
+}
+
 function addSpeakerRow(data = {}) {
+  syncSpeakerRowsFromDOM(); // save existing rows before re-render
   const rid = ++speakerRowCounter;
   speakerRows.push({ _rid: rid, ...data });
   renderSpeakerRows();
 }
 
 function removeSpeakerRow(rid) {
+  syncSpeakerRowsFromDOM();
   speakerRows = speakerRows.filter(s => s._rid !== rid);
   renderSpeakerRows();
 }
@@ -876,25 +892,21 @@ async function handleSpeakerImageUpload(e, rid) {
   const url = await uploadImageToBlob(file, null, `sp-preview-${rid}`, `sp-status-${rid}`);
   if (url) {
     row.imageUrl = url;
-    // update the URL input in this row
     const rowEl = document.querySelector(`.speaker-row[data-rid="${rid}"] .sp-image-url`);
     if (rowEl) rowEl.value = url;
   }
 }
 
 function collectSpeakers() {
-  return Array.from(document.querySelectorAll('.speaker-row')).map(row => {
-    const rid = parseInt(row.dataset.rid);
-    const stored = speakerRows.find(s => s._rid === rid) || {};
-    return {
-      id: stored.id || undefined,
-      name: row.querySelector('.sp-name')?.value.trim() || '',
-      role: row.querySelector('.sp-role')?.value.trim() || '',
-      bio: row.querySelector('.sp-bio')?.value.trim() || '',
-      imageUrl: row.querySelector('.sp-image-url')?.value.trim() || stored.imageUrl || '',
-      link: row.querySelector('.sp-link')?.value.trim() || ''
-    };
-  }).filter(s => s.name);
+  syncSpeakerRowsFromDOM();
+  return speakerRows.map(s => ({
+    id: s.id || undefined,
+    name: s.name?.trim() || '',
+    role: s.role?.trim() || '',
+    bio: s.bio?.trim() || '',
+    imageUrl: s.imageUrl || '',
+    link: s.link?.trim() || ''
+  })).filter(s => s.name);
 }
 
 function editEvent(ev) {

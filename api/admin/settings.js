@@ -73,7 +73,7 @@ export default async function handler(req, res) {
     const memberData = {
       name: name.trim().substring(0, 60),
       role: (memberRole || '').trim().substring(0, 60),
-      bio: (bio || '').trim().substring(0, 400),
+      bio: (bio || '').trim().substring(0, 2000),
       imageUrl: (imageUrl || '').trim(),
       link: (link || '').trim(),
       contact: (contact || '').trim().substring(0, 100)
