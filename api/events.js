@@ -2,16 +2,14 @@
 import { kv } from './_kv.js';
 import { cors, ok, err } from './_lib.js';
 
-// Upstash auto-deserializes JSON-like hash values (e.g. "true" -> boolean true).
-// We always store/expect plain strings, so normalize every field back to string.
-// Special case: teamMembers and speakers are JSON arrays — Upstash deserializes them
-// to actual JS arrays, so we re-stringify them instead of using String() which would
-// produce "[object Object]".
+// JSON array fields that Upstash deserializes — re-stringify them.
+const JSON_ARRAY_FIELDS = new Set(['teamMembers', 'speakers', 'tagThemes']);
+
 function normalizeRecord(record) {
   if (!record) return record;
   const out = {};
   for (const [k, v] of Object.entries(record)) {
-    if (k === 'teamMembers' || k === 'speakers') {
+    if (JSON_ARRAY_FIELDS.has(k)) {
       if (Array.isArray(v) || (typeof v === 'object' && v !== null)) {
         out[k] = JSON.stringify(v);
       } else {
@@ -37,6 +35,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return err(res, 'Method not allowed', 405);
 
+  // Smart cache: referer tells us which page is asking.
+  // index.html wants fresh content (30s), archive/team pages can cache longer (120s).
+  const referer = req.headers['referer'] || '';
+  const isArchive = referer.includes('events.html') || referer.includes('team.html');
+  const maxAge = isArchive ? 120 : 30;
+  res.setHeader('Cache-Control', `s-maxage=${maxAge}, stale-while-revalidate=60`);
+
   const ids = await kv.smembers('events');
   const settings = await getSettings(kv);
   const teamMembers = parseTeamMembers(settings);
@@ -58,7 +63,7 @@ async function getSettings(kv) {
   const s = await kv.hgetall('settings');
   return s ? normalizeRecord(s) : {
     displayMode: 'single',
-    siteTitle: 'Sentria Events',
+    siteTitle: 'Events',
     siteSubtitle: '',
     collectName: 'true',
     heroText: '',

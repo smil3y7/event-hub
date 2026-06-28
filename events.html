@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dogodki</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/_shared.css">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Dogodki">
+<meta property="og:description" content="">
+<meta property="og:image" content="/og-image.svg">
+<meta property="og:url" content="">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dogodki">
+<meta name="twitter:image" content="/og-image.svg">
+<script defer src="/_vercel/insights/script.js"></script>
+<style>
+/* Tag filter bar */
+.tag-filter-bar {
+  max-width: 1100px; margin: 1.5rem auto 0; padding: 0 1.5rem;
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+}
+.tag-filter-bar .label {
+  font-family: var(--sans); font-size: 0.75rem; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-right: 0.4rem;
+  white-space: nowrap;
+}
+.tag-filter-separator {
+  width: 1px; height: 18px; background: var(--border); margin: 0 0.4rem;
+  display: inline-block; flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a href="/" class="site-nav-logo">✦ <span id="nav-title">Events</span></a>
+    <div class="site-nav-links">
+      <a href="/" class="nav-link">Domov</a>
+      <a href="/events.html" class="nav-link">Dogodki</a>
+      <a href="/team.html" class="nav-link">Ekipa</a>
+      <a href="/admin.html" class="nav-admin" title="Admin">⬡</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header class="site-header">
+    <span class="header-star">✦ ✦ ✦</span>
+    <h1>Dogodki</h1>
+    <p id="site-subtitle"></p>
+  </header>
+
+  <!-- Filter tabs: upcoming / past -->
+  <div id="filter-tabs-wrap" style="display:none">
+    <div class="filter-tabs" id="filter-tabs">
+      <button class="filter-tab active" data-filter="upcoming" onclick="setFilter('upcoming')">Prihajajoči</button>
+      <button class="filter-tab" data-filter="past" onclick="setFilter('past')">Pretekli</button>
+      <button class="filter-tab" data-filter="all" onclick="setFilter('all')">Vsi</button>
+    </div>
+  </div>
+
+  <!-- Tag filter bar -->
+  <div class="tag-filter-bar" id="tag-filter-bar" style="display:none">
+    <span class="label">Tip:</span>
+    <div id="type-filters"></div>
+    <div class="tag-filter-separator"></div>
+    <span class="label">Tema:</span>
+    <div id="theme-filters"></div>
+  </div>
+
+  <!-- Skeleton -->
+  <div id="skeleton-wrap">
+    <div class="section-divider"><h2>&nbsp;</h2></div>
+    <div class="events-grid">${'<div class="skeleton-card"><div class="skeleton-img skel"></div><div class="skeleton-body"><div class="skel" style="height:12px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:18px;width:85%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:100%"></div></div></div>'.repeat(3)}</div>
+  </div>
+
+  <main id="main"></main>
+
+  <footer class="site-footer"><p id="footer-text"></p></footer>
+</div>
+
+<button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Na vrh">↑</button>
+
+<div class="subscribe-bar" id="subscribe-bar">
+  <form class="subscribe-bar-inner" onsubmit="handleSubscribe(event)">
+    <div class="bar-msg" id="sub-msg-bar" style="display:none"></div>
+    <input type="text" class="sub-name name-field" placeholder="Ime">
+    <input type="email" class="sub-email" placeholder="E-mail za vabila na dogodke" required autocomplete="email">
+    <button type="submit">Prijavi se</button>
+  </form>
+</div>
+
+<script src="/_shared.js"></script>
+<script>
+const PAGE_SIZE = 6;
+let allEvents = [];
+let currentFilter = 'upcoming';
+let activeTagType = null;
+let activeTagThemes = new Set();
+let visibleCount = PAGE_SIZE;
+let displayMode = 'catalog';
+let collectName = false;
+
+const GLOBE_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+
+function toggleCollapsible(btn, bodyId) {
+  const isOpen = btn.classList.contains('open');
+  btn.classList.toggle('open', !isOpen);
+  btn.querySelector('.chevron').textContent = isOpen ? '▾' : '▴';
+  const lbl = btn.querySelector('.btn-label');
+  if (lbl) lbl.textContent = isOpen ? (btn.dataset.openLabel || 'Več') : (btn.dataset.closeLabel || 'Skrij');
+  document.getElementById(bodyId)?.classList.toggle('open', !isOpen);
+}
+
+// Tag filters
+function buildTagFilters(events) {
+  const usedTypes = new Set(events.map(e => e.tagType).filter(Boolean));
+  const usedThemes = new Set(events.flatMap(e => parseTags(e).filter(t => t !== e.tagType)));
+  if (!usedTypes.size && !usedThemes.size) return;
+  document.getElementById('tag-filter-bar').style.display = '';
+
+  document.getElementById('type-filters').innerHTML = [...usedTypes].map(id => {
+    const lbl = EVENT_TAGS.types.find(t => t.id === id)?.label || id;
+    return `<button class="tag-pill clickable type" data-id="${id}" onclick="toggleTypeFilter('${id}')">${lbl}</button>`;
+  }).join('');
+
+  document.getElementById('theme-filters').innerHTML = [...usedThemes].map(id => {
+    const lbl = EVENT_TAGS.themes.find(t => t.id === id)?.label || id;
+    return `<button class="tag-pill clickable" data-id="${id}" onclick="toggleThemeFilter('${id}')">${lbl}</button>`;
+  }).join('');
+}
+
+function toggleTypeFilter(id) {
+  activeTagType = activeTagType === id ? null : id;
+  visibleCount = PAGE_SIZE;
+  document.querySelectorAll('#type-filters .tag-pill').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === activeTagType);
+  });
+  renderMain();
+}
+
+function toggleThemeFilter(id) {
+  activeTagThemes.has(id) ? activeTagThemes.delete(id) : activeTagThemes.add(id);
+  visibleCount = PAGE_SIZE;
+  document.querySelectorAll('#theme-filters .tag-pill').forEach(el => {
+    el.classList.toggle('active', activeTagThemes.has(el.dataset.id));
+  });
+  renderMain();
+}
+
+function filterByTag(id) {
+  // Called from tag pill clicks on cards
+  const isType = EVENT_TAGS.types.some(t => t.id === id);
+  if (isType) toggleTypeFilter(id);
+  else toggleThemeFilter(id);
+}
+
+function applyTagFilters(events) {
+  return events.filter(ev => {
+    if (activeTagType && ev.tagType !== activeTagType) return false;
+    if (activeTagThemes.size > 0) {
+      let themes = [];
+      try { themes = JSON.parse(ev.tagThemes || '[]'); } catch {}
+      if (!Array.isArray(themes)) themes = [];
+      if (![...activeTagThemes].every(t => themes.includes(t))) return false;
+    }
+    return true;
+  });
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  visibleCount = PAGE_SIZE;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.toggle('active', t.dataset.filter === filter));
+  renderMain();
+}
+
+function getFilteredEvents() {
+  const published = allEvents.filter(e => e.published === 'true');
+  let pool;
+  if (currentFilter === 'upcoming') pool = published.filter(e => isUpcoming(e.date)).sort((a, b) => (a.date||'').localeCompare(b.date||''));
+  else if (currentFilter === 'past') pool = published.filter(e => !isUpcoming(e.date)).sort((a, b) => (b.date||'').localeCompare(a.date||''));
+  else pool = [
+    ...published.filter(e => isUpcoming(e.date)).sort((a, b) => (a.date||'').localeCompare(b.date||'')),
+    ...published.filter(e => !isUpcoming(e.date)).sort((a, b) => (b.date||'').localeCompare(a.date||''))
+  ];
+  return applyTagFilters(pool);
+}
+
+function eventCardHtml(ev, isPast) {
+  const tags = parseTags(ev);
+  return `
+    <article class="event-card${isPast ? ' is-past' : ''}" data-event-theme="${ev.colorTag||'oneiro-dark'}" onclick="openEventModal('${ev.id}')">
+      ${renderImage(ev.imageUrl, 'card-img')}
+      <div class="card-body">
+        <div class="card-meta"><span class="mini-tag"></span>${ev.date ? formatDate(ev.date) : ''}${ev.time ? ' · '+ev.time : ''}${ev.eventType==='recurring' ? ' · ↻ Serija' : ''}</div>
+        <h3>${ev.title}</h3>
+        <p class="card-desc">${ev.description || ''}</p>
+        ${tags.length ? `<div class="tag-pills-row" style="margin-top:0.6rem">${renderTagPills(tags, true)}</div>` : ''}
+      </div>
+    </article>`;
+}
+
+let allEventsMap = {};
+function openEventModal(id) {
+  const ev = allEventsMap[id];
+  if (!ev) return;
+  const speakers = parseSpeakers(ev);
+  const tags = parseTags(ev);
+  const uid = id.slice(0,6);
+  const descFull = `mdf-${uid}`;
+  const spBody = `msp-${uid}`;
+  const previewWords = 80;
+  const words = (ev.description || '').split(/\s+/);
+  const isLong = words.length > previewWords;
+  const preview = words.slice(0, previewWords).join(' ') + (isLong ? '…' : '');
+
+  document.getElementById('modal-content').innerHTML = `
+    ${renderImage(ev.imageUrl, 'event-image')}
+    <div class="event-meta">${eventBadges(ev)}</div>
+    ${tags.length ? `<div class="tag-pills-row">${renderTagPills(tags, true)}</div>` : ''}
+    <h2 style="font-size:clamp(1.4rem,4vw,2rem);font-weight:400;margin:1rem 0 1.2rem;line-height:1.2">${ev.title}</h2>
+    ${isLong ? `
+      <p class="desc-preview" id="mdp-${uid}">${preview}</p>
+      <div class="collapsible-body" id="${descFull}"><p style="font-size:1.05rem;line-height:1.75;color:var(--text2);white-space:pre-line">${ev.description}</p></div>
+      <button class="collapsible-trigger" data-open-label="Preberi več" data-close-label="Skrij" onclick="toggleCollapsible(this,'${descFull}')">
+        <span class="btn-label">Preberi več</span><span class="chevron">▾</span>
+      </button>` : `<p style="font-size:1.05rem;line-height:1.75;color:var(--text2);white-space:pre-line">${ev.description||''}</p>`}
+    ${ev.locationUrl ? `<a class="location-link" href="${ev.locationUrl}" target="_blank" rel="noopener">↗ ${ev.isOnline==='true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
+    ${speakers.length ? `
+      <div style="margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--border)">
+        <button class="collapsible-trigger" data-open-label="Predavatelji" data-close-label="Skrij predavatelje" onclick="toggleCollapsible(this,'${spBody}')">
+          <span class="btn-label">Predavatelji</span><span class="chevron">▾</span>
+        </button>
+        <div class="collapsible-body" id="${spBody}">
+          ${speakers.map(s => `
+            <div style="display:flex;gap:0.8rem;align-items:flex-start;margin-top:1rem">
+              ${s.imageUrl ? `<img src="${s.imageUrl}" alt="${s.name}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" onerror="this.style.display='none'">` : ''}
+              <div>
+                <div style="font-size:0.92rem;color:var(--text)">${s.name}</div>
+                ${s.role ? `<div style="font-size:0.76rem;color:var(--accent2);font-family:var(--sans)">${s.role}</div>` : ''}
+                ${s.bio ? `<p style="font-size:0.84rem;color:var(--text2);line-height:1.6;margin:0.3rem 0 0">${s.bio}</p>` : ''}
+                ${s.link ? `<a href="${s.link}" target="_blank" rel="noopener" style="font-size:0.8rem;color:var(--accent);text-decoration:none;font-family:var(--sans);display:inline-flex;align-items:center;gap:2px;margin-top:0.3rem">${GLOBE_ICON}Spletna stran</a>` : ''}
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}`;
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function renderMain() {
+  const filtered = getFilteredEvents();
+  const main = document.getElementById('main');
+  if (!filtered.length) {
+    main.innerHTML = `<div class="empty-state"><div class="symbol">☽</div><p>Ni dogodkov za ta filter.</p></div>`;
+    return;
+  }
+
+  const slice = filtered.slice(0, visibleCount);
+  const showMore = filtered.length > visibleCount;
+
+  if (displayMode === 'catalog') {
+    main.innerHTML = `<div class="events-grid">${slice.map(ev => eventCardHtml(ev, !isUpcoming(ev.date))).join('')}</div>`;
+  } else if (displayMode === 'series') {
+    main.innerHTML = `<div class="timeline">${slice.map((ev, i) => `
+      <div class="timeline-item${!isUpcoming(ev.date) ? ' is-past' : ''}" data-event-theme="${ev.colorTag||'oneiro-dark'}" onclick="openEventModal('${ev.id}')">
+        <div class="timeline-dot${isUpcoming(ev.date) ? ' future' : ''}">${ev.date ? formatDateShort(ev.date) : String(i+1).padStart(2,'0')}</div>
+        <div class="timeline-body">
+          <h3>${ev.title}</h3>
+          <div class="tl-meta">${ev.date ? formatDate(ev.date) : ''}${ev.time ? ' · '+ev.time : ''}${ev.isOnline==='true' ? ' · Online' : ev.location ? ' · '+ev.location : ''}</div>
+          <p class="tl-desc">${ev.description || ''}</p>
+        </div>
+      </div>`).join('')}</div>`;
+  } else {
+    // single
+    main.innerHTML = slice.map((ev, i) => eventCardHtml(ev, !isUpcoming(ev.date))).join('');
+  }
+
+  if (showMore) {
+    const btn = document.createElement('div');
+    btn.className = 'load-more-wrap';
+    btn.innerHTML = `<button class="load-more-btn" onclick="loadMore()">Prikaži več (${filtered.length - visibleCount} preostankov)</button>`;
+    main.appendChild(btn);
+  }
+}
+
+function loadMore() { visibleCount += PAGE_SIZE; renderMain(); }
+
+async function handleSubscribe(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('[type=submit]');
+  const msg = document.getElementById('sub-msg-bar');
+  btn.disabled = true; msg.style.display = 'none';
+  try {
+    const res = await fetch(`${API}/subscribe`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: e.target.querySelector('.sub-email').value.trim(), name: e.target.querySelector('.sub-name')?.value?.trim() || '' })
+    });
+    const data = await res.json();
+    msg.style.display = 'block'; msg.className = 'bar-msg '+(data.ok?'ok':'error');
+    msg.textContent = data.ok ? '✦ Prijava uspešna.' : (data.error||'Napaka.');
+    if (data.ok) e.target.reset();
+    setTimeout(() => { msg.style.display = 'none'; }, 4000);
+  } catch { msg.style.display = 'block'; msg.className = 'bar-msg error'; msg.textContent = 'Napaka pri povezavi.'; }
+  finally { btn.disabled = false; }
+}
+
+async function init() {
+  try {
+    const data = await fetchPublicData();
+    const { events = [], settings = {}, teamMembers = [] } = data;
+
+    const title = settings.siteTitle || 'Events';
+    document.getElementById('nav-title').textContent = title;
+    if (settings.siteSubtitle) document.getElementById('site-subtitle').textContent = settings.siteSubtitle;
+    if (settings.footerText) document.getElementById('footer-text').textContent = settings.footerText;
+    collectName = settings.collectName === 'true';
+    if (collectName) document.getElementById('subscribe-bar').classList.add('show-name');
+    displayMode = settings.displayMode || 'catalog';
+
+    allEvents = events;
+    events.forEach(ev => { allEventsMap[ev.id] = ev; });
+
+    document.getElementById('skeleton-wrap')?.remove();
+
+    const published = events.filter(e => e.published === 'true');
+    const hasPast = published.some(e => !isUpcoming(e.date));
+    const hasUpcoming = published.some(e => isUpcoming(e.date));
+    if (hasPast && hasUpcoming) document.getElementById('filter-tabs-wrap').style.display = '';
+
+    buildTagFilters(published);
+
+    // Read tag from URL ?tag=id
+    const urlTag = new URLSearchParams(window.location.search).get('tag');
+    if (urlTag) {
+      const isType = EVENT_TAGS.types.some(t => t.id === urlTag);
+      if (isType) { activeTagType = urlTag; document.querySelectorAll('#type-filters .tag-pill').forEach(el => el.classList.toggle('active', el.dataset.id === urlTag)); }
+      else { activeTagThemes.add(urlTag); document.querySelectorAll('#theme-filters .tag-pill').forEach(el => el.classList.toggle('active', activeTagThemes.has(el.dataset.id))); }
+    }
+
+    renderMain();
+  } catch (e) {
+    document.getElementById('skeleton-wrap')?.remove();
+    document.getElementById('main').innerHTML = `<div class="empty-state"><div class="symbol">!</div><p>Napaka pri nalaganju.</p></div>`;
+  }
+}
+
+initNav();
+initBackToTop();
+init();
+</script>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()" aria-label="Zapri">✕</button>
+    <div class="modal-content" id="modal-content"></div>
+  </div>
+</div>
+</body>
+</html>

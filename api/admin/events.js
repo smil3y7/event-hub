@@ -46,7 +46,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { id, title, description, date, time, location, locationUrl, imageUrl,
-            isOnline, published, colorTag, eventType, speakers } = req.body || {};
+            isOnline, published, colorTag, eventType, speakers,
+            tagType, tagThemes } = req.body || {};
     if (!title) return err(res, 'Title is required');
 
     const eventId = id || randomUUID();
@@ -66,6 +67,12 @@ export default async function handler(req, res) {
       link: (s.link || '').trim()
     })).filter(s => s.name) : [];
 
+    // Sanitize tags
+    const safeTagType = typeof tagType === 'string' ? tagType.trim().substring(0, 40) : '';
+    const safeTagThemes = Array.isArray(tagThemes)
+      ? tagThemes.filter(t => typeof t === 'string').map(t => t.trim()).filter(Boolean)
+      : [];
+
     const fields = {
       id: eventId,
       title: title.trim(),
@@ -80,6 +87,8 @@ export default async function handler(req, res) {
       colorTag: safeColor,
       eventType: safeType,
       speakers: JSON.stringify(safeSpeakers),
+      tagType: safeTagType,
+      tagThemes: JSON.stringify(safeTagThemes),
       updatedAt: new Date().toISOString()
     };
     if (!isUpdate) fields.createdAt = new Date().toISOString();

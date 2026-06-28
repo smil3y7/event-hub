@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0a0a12"/>
+  <!-- Subtle grid -->
+  <line x1="0" y1="210" x2="1200" y2="210" stroke="#16162a" stroke-width="1"/>
+  <line x1="0" y1="420" x2="1200" y2="420" stroke="#16162a" stroke-width="1"/>
+  <line x1="400" y1="0" x2="400" y2="630" stroke="#16162a" stroke-width="1"/>
+  <line x1="800" y1="0" x2="800" y2="630" stroke="#16162a" stroke-width="1"/>
+  <!-- Accent glow -->
+  <ellipse cx="600" cy="315" rx="280" ry="140" fill="#7c6dfa" opacity="0.06"/>
+  <!-- Star symbol -->
+  <text x="600" y="280" font-size="72" font-family="Georgia, serif" fill="#c4a44a" text-anchor="middle" opacity="0.9">✦</text>
+  <!-- Title placeholder — replace OG_SITE_TITLE in _meta.js or directly in HTML -->
+  <text x="600" y="360" font-size="36" font-family="Georgia, serif" fill="#e8e4ff" text-anchor="middle" opacity="0.95">Dogodki</text>
+  <text x="600" y="410" font-size="18" font-family="Georgia, serif" fill="#9d97c8" text-anchor="middle" opacity="0.7">Prebudi se v svoje sanje</text>
+  <!-- Bottom accent line -->
+  <rect x="520" y="450" width="160" height="2" fill="#7c6dfa" opacity="0.5" rx="1"/>
+</svg>

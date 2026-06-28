@@ -138,6 +138,16 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 .color-tag-opt:hover { transform: scale(1.08); }
 .color-tag-opt.selected { border-color: var(--text); }
 
+/* Admin tag pickers */
+.admin-tag-pill {
+  font-family: var(--sans); font-size: 0.78rem; padding: 0.28em 0.75em;
+  border-radius: 100px; border: 1px solid var(--border); background: var(--bg3);
+  color: var(--text3); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.admin-tag-pill:hover { color: var(--text2); border-color: var(--text3); }
+.admin-tag-pill.selected-type { background: rgba(196,164,74,0.12); color: var(--accent2); border-color: var(--accent2); }
+.admin-tag-pill.selected-theme { background: rgba(124,109,250,0.12); color: var(--accent); border-color: var(--accent); }
+
 .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; }
 .mode-opt {
   border: 2px solid var(--border); border-radius: 10px; padding: 1rem 0.6rem; cursor: pointer;
@@ -324,6 +334,22 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
               </div>
             </div>
           </div>
+
+          <!-- Tags -->
+          <div style="border-top:1px solid var(--border); margin:0.8rem 0; padding-top:0.8rem">
+            <p style="color:var(--text3); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.8rem">Tagi (neobvezno)</p>
+            <div class="row">
+              <div class="field">
+                <label style="font-size:0.78rem; margin-bottom:0.5rem; display:block">Tip (izberi enega)</label>
+                <div id="ev-tag-types" style="display:flex; flex-wrap:wrap; gap:0.4rem"></div>
+              </div>
+              <div class="field">
+                <label style="font-size:0.78rem; margin-bottom:0.5rem; display:block">Teme (več izborov)</label>
+                <div id="ev-tag-themes" style="display:flex; flex-wrap:wrap; gap:0.4rem"></div>
+              </div>
+            </div>
+          </div>
+
           <div class="checkbox-field">
             <input type="checkbox" id="ev-published" checked>
             <label for="ev-published">Objavljeno (vidno na javni strani)</label>
@@ -809,6 +835,76 @@ async function uploadImageToBlob(file, targetInputId, previewId, statusId) {
   }
 }
 
+// ── TAG DEFINITIONS (must match _shared.js EVENT_TAGS) ───────────────────
+const EVENT_TAGS = {
+  types: [
+    { id: 'delavnica', label: 'Delavnica' },
+    { id: 'predavanje', label: 'Predavanje' },
+    { id: 'ritual', label: 'Ritual' },
+    { id: 'meditacija', label: 'Meditacija' },
+    { id: 'pogovor', label: 'Pogovor' },
+    { id: 'drugo', label: 'Drugo' }
+  ],
+  themes: [
+    { id: 'sanje', label: 'Sanje' },
+    { id: 'lucidno-sanjanje', label: 'Lucidno sanjanje' },
+    { id: 'samanizem', label: 'Šamanizem' },
+    { id: 'zavest', label: 'Zavest' },
+    { id: 'energija', label: 'Energija' },
+    { id: 'telo', label: 'Telo' },
+    { id: 'narava', label: 'Narava' },
+    { id: 'zdravljenje', label: 'Zdravljenje' },
+    { id: 'drugo', label: 'Drugo' }
+  ]
+};
+
+let currentTagType = '';
+let currentTagThemes = new Set();
+
+function initTagPickers() {
+  const typesEl = document.getElementById('ev-tag-types');
+  const themesEl = document.getElementById('ev-tag-themes');
+  if (!typesEl || !themesEl) return;
+  typesEl.innerHTML = EVENT_TAGS.types.map(t =>
+    `<button type="button" class="admin-tag-pill" data-id="${t.id}" onclick="toggleTagType('${t.id}')">${t.label}</button>`
+  ).join('');
+  themesEl.innerHTML = EVENT_TAGS.themes.map(t =>
+    `<button type="button" class="admin-tag-pill" data-id="${t.id}" onclick="toggleTagTheme('${t.id}')">${t.label}</button>`
+  ).join('');
+}
+
+function toggleTagType(id) {
+  currentTagType = currentTagType === id ? '' : id;
+  document.querySelectorAll('#ev-tag-types .admin-tag-pill').forEach(el => {
+    el.classList.toggle('selected-type', el.dataset.id === currentTagType);
+  });
+}
+
+function toggleTagTheme(id) {
+  currentTagThemes.has(id) ? currentTagThemes.delete(id) : currentTagThemes.add(id);
+  document.querySelectorAll('#ev-tag-themes .admin-tag-pill').forEach(el => {
+    el.classList.toggle('selected-theme', currentTagThemes.has(el.dataset.id));
+  });
+}
+
+function resetTagPickers() {
+  currentTagType = '';
+  currentTagThemes.clear();
+  document.querySelectorAll('#ev-tag-types .admin-tag-pill').forEach(el => el.classList.remove('selected-type'));
+  document.querySelectorAll('#ev-tag-themes .admin-tag-pill').forEach(el => el.classList.remove('selected-theme'));
+}
+
+function loadTagPickers(tagType, tagThemes) {
+  currentTagType = tagType || '';
+  currentTagThemes = new Set(Array.isArray(tagThemes) ? tagThemes : (typeof tagThemes === 'string' && tagThemes ? JSON.parse(tagThemes) : []));
+  document.querySelectorAll('#ev-tag-types .admin-tag-pill').forEach(el => {
+    el.classList.toggle('selected-type', el.dataset.id === currentTagType);
+  });
+  document.querySelectorAll('#ev-tag-themes .admin-tag-pill').forEach(el => {
+    el.classList.toggle('selected-theme', currentTagThemes.has(el.dataset.id));
+  });
+}
+
 let currentEventColor = 'oneiro-dark';
 function selectEventColor(color) {
   currentEventColor = color;
@@ -923,6 +1019,10 @@ function editEvent(ev) {
   document.getElementById('ev-eventtype').value = ev.eventType === 'recurring' ? 'recurring' : 'single';
   selectEventColor(ev.colorTag || 'oneiro-dark');
   document.getElementById('ev-published').checked = ev.published === 'true';
+  // load tags
+  let themes = [];
+  try { themes = JSON.parse(ev.tagThemes || '[]'); } catch {}
+  loadTagPickers(ev.tagType || '', themes);
   // load speakers
   speakerRows = [];
   speakerRowCounter = 0;
@@ -933,7 +1033,7 @@ function editEvent(ev) {
     else if (typeof v === 'string' && v) parsedSpeakers = JSON.parse(v);
   } catch {}
   parsedSpeakers.forEach(s => addSpeakerRow(s));
-  if (!parsedSpeakers.length) renderSpeakerRows(); // show empty hint
+  if (!parsedSpeakers.length) renderSpeakerRows();
   document.getElementById('event-form-title').textContent = 'Uredi dogodek';
   document.getElementById('ev-save-btn').textContent = 'Posodobi dogodek';
   document.getElementById('ev-cancel-btn').style.display = 'inline-flex';
@@ -952,6 +1052,7 @@ function resetEventForm() {
   document.getElementById('upload-status').textContent = '';
   showImagePreview('');
   selectEventColor('oneiro-dark');
+  resetTagPickers();
   speakerRows = []; speakerRowCounter = 0;
   renderSpeakerRows();
   toggleLocationLabel();
@@ -972,7 +1073,9 @@ async function handleSaveEvent(e) {
     eventType: document.getElementById('ev-eventtype').value,
     colorTag: currentEventColor,
     published: document.getElementById('ev-published').checked,
-    speakers: collectSpeakers()
+    speakers: collectSpeakers(),
+    tagType: currentTagType,
+    tagThemes: [...currentTagThemes]
   };
   try {
     await apiCall('/admin/events', { method: 'POST', body: JSON.stringify(payload) });
@@ -1254,7 +1357,8 @@ function exportCsv() {
 /* ── INIT ── */
 if (token) { enterApp(); } else { document.getElementById('login-screen').style.display = 'flex'; }
 toggleLocationLabel();
-renderSpeakerRows(); // show empty hint on load
+renderSpeakerRows();
+initTagPickers();
 </script>
 </body>
 </html>

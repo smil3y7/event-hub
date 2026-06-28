@@ -7,6 +7,19 @@
         { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization" }
       ]
+    },
+    {
+      "source": "/_shared.css",
+      "headers": [{ "key": "Content-Type", "value": "text/css" }]
+    },
+    {
+      "source": "/_shared.js",
+      "headers": [{ "key": "Content-Type", "value": "application/javascript" }]
     }
+  ],
+  "rewrites": [
+    { "source": "/events", "destination": "/events.html" },
+    { "source": "/team", "destination": "/team.html" },
+    { "source": "/unsubscribe", "destination": "/unsubscribe.html" }
   ]
 }
