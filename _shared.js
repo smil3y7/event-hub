@@ -24,7 +24,9 @@ const EVENT_TAGS = {
   themes: [
     { id: 'sanje', label: 'Sanje' },
     { id: 'lucidno-sanjanje', label: 'Lucidno sanjanje' },
-    { id: 'samanizem', label: 'Šamanizem' },
+    { id: 'oobe', label: 'OOBE' },	
+    { id: 'izventelesne-izkusnje', label: 'Izventelesne izkušnje' },	
+	{ id: 'samanizem', label: 'Šamanizem' },
     { id: 'zavest', label: 'Zavest' },
     { id: 'energija', label: 'Energija' },
     { id: 'telo', label: 'Telo' },
