@@ -200,6 +200,8 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 .char-counter.warn { color: var(--accent2); }
 .char-counter.error { color: var(--danger); }
 </style>
+<!-- Load _shared.js only for EVENT_TAGS constant — admin has its own auth/API logic -->
+<script src="/_shared.js"></script>
 </head>
 <body>
 
@@ -835,30 +837,7 @@ async function uploadImageToBlob(file, targetInputId, previewId, statusId) {
   }
 }
 
-// ── TAG DEFINITIONS (must match _shared.js EVENT_TAGS) ───────────────────
-const EVENT_TAGS = {
-  types: [
-    { id: 'delavnica', label: 'Delavnica' },
-    { id: 'predavanje', label: 'Predavanje' },
-    { id: 'ritual', label: 'Ritual' },
-    { id: 'meditacija', label: 'Meditacija' },
-    { id: 'pogovor', label: 'Pogovor' },
-    { id: 'drugo', label: 'Drugo' }
-  ],
-  themes: [
-    { id: 'sanje', label: 'Sanje' },
-    { id: 'lucidno-sanjanje', label: 'Lucidno sanjanje' },
-    { id: 'samanizem', label: 'Šamanizem' },
-	{ id: 'oobe', label: 'OOBE' },
-	{ id: 'izventelesne-izkusnje', label: 'Izventelesne izkušnje' },	
-    { id: 'zavest', label: 'Zavest' },
-    { id: 'energija', label: 'Energija' },
-    { id: 'telo', label: 'Telo' },
-    { id: 'narava', label: 'Narava' },
-    { id: 'zdravljenje', label: 'Zdravljenje' },
-    { id: 'drugo', label: 'Drugo' }
-  ]
-};
+// EVENT_TAGS is loaded from /_shared.js — edit tags only there
 
 let currentTagType = '';
 let currentTagThemes = new Set();

@@ -2,7 +2,8 @@
 // Loaded via <script src="/_shared.js"> on every public page.
 
 // ── CONFIGURATION ─────────────────────────────────────────────────────────
-const API = '/api';
+// Using var so pages that load _shared.js can safely redeclare API if needed
+var API = '/api'; // eslint-disable-line no-var
 
 // Open Graph image — change this one URL to update og:image across all pages.
 // Use an absolute URL to a JPG/PNG for best social media compatibility.
@@ -24,8 +25,6 @@ const EVENT_TAGS = {
     { id: 'sanje', label: 'Sanje' },
     { id: 'lucidno-sanjanje', label: 'Lucidno sanjanje' },
     { id: 'samanizem', label: 'Šamanizem' },
-    { id: 'oobe', label: 'OOBE' },
-	{ id: 'izventelesne-izkusnje', label: 'Izventelesne izkušnje' },
     { id: 'zavest', label: 'Zavest' },
     { id: 'energija', label: 'Energija' },
     { id: 'telo', label: 'Telo' },
@@ -202,6 +201,29 @@ function initNav() {
     const isMatch = href !== '/' && href !== '/index.html' && path.includes(href.replace('.html', ''));
     if (isHome || isMatch) a.classList.add('active');
   });
+
+  // Inject hamburger button into nav
+  const navInner = document.querySelector('.site-nav-inner');
+  const links = document.querySelector('.site-nav-links');
+  if (navInner && links) {
+    const btn = document.createElement('button');
+    btn.className = 'nav-hamburger';
+    btn.setAttribute('aria-label', 'Meni');
+    btn.innerHTML = '☰';
+    btn.addEventListener('click', () => {
+      const open = links.classList.toggle('open');
+      btn.innerHTML = open ? '✕' : '☰';
+    });
+    // Close on outside click
+    document.addEventListener('click', e => {
+      if (!navInner.contains(e.target)) {
+        links.classList.remove('open');
+        btn.innerHTML = '☰';
+      }
+    });
+    navInner.appendChild(btn);
+  }
+
   // Set copyright year dynamically
   const yearEl = document.getElementById('footer-year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
