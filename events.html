@@ -58,17 +58,16 @@
     <div class="filter-tabs" id="filter-tabs">
       <button class="filter-tab active" data-filter="upcoming" onclick="setFilter('upcoming')">Prihajajoči</button>
       <button class="filter-tab" data-filter="past" onclick="setFilter('past')">Pretekli</button>
-      <button class="filter-tab" data-filter="all" onclick="setFilter('all')">Vsi</button>
     </div>
   </div>
 
   <!-- Tag filter bar -->
   <div class="tag-filter-bar" id="tag-filter-bar" style="display:none">
     <span class="label">Tip:</span>
-    <div id="type-filters"></div>
-    <div class="tag-filter-separator"></div>
+    <div id="type-filters" style="display:flex; flex-wrap:wrap; gap:0.4rem"></div>
+    <div class="tag-filter-separator" style="margin:0 0.8rem"></div>
     <span class="label">Tema:</span>
-    <div id="theme-filters"></div>
+    <div id="theme-filters" style="display:flex; flex-wrap:wrap; gap:0.4rem"></div>
   </div>
 
   <!-- Skeleton -->
@@ -79,7 +78,10 @@
 
   <main id="main"></main>
 
-  <footer class="site-footer"><p id="footer-text"></p></footer>
+  <footer class="site-footer">
+    <p id="footer-text"></p>
+    <p style="margin-top:0.5rem; opacity:0.5">&copy; <span id="footer-year"></span></p>
+  </footer>
 </div>
 
 <button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Na vrh">↑</button>
@@ -269,9 +271,7 @@ function renderMain() {
   const slice = filtered.slice(0, visibleCount);
   const showMore = filtered.length > visibleCount;
 
-  if (displayMode === 'catalog') {
-    main.innerHTML = `<div class="events-grid">${slice.map(ev => eventCardHtml(ev, !isUpcoming(ev.date))).join('')}</div>`;
-  } else if (displayMode === 'series') {
+  if (displayMode === 'series') {
     main.innerHTML = `<div class="timeline">${slice.map((ev, i) => `
       <div class="timeline-item${!isUpcoming(ev.date) ? ' is-past' : ''}" data-event-theme="${ev.colorTag||'oneiro-dark'}" onclick="openEventModal('${ev.id}')">
         <div class="timeline-dot${isUpcoming(ev.date) ? ' future' : ''}">${ev.date ? formatDateShort(ev.date) : String(i+1).padStart(2,'0')}</div>
@@ -282,8 +282,8 @@ function renderMain() {
         </div>
       </div>`).join('')}</div>`;
   } else {
-    // single
-    main.innerHTML = slice.map((ev, i) => eventCardHtml(ev, !isUpcoming(ev.date))).join('');
+    // catalog (default)
+    main.innerHTML = `<div class="events-grid">${slice.map(ev => eventCardHtml(ev, !isUpcoming(ev.date))).join('')}</div>`;
   }
 
   if (showMore) {
@@ -326,7 +326,8 @@ async function init() {
     if (settings.footerText) document.getElementById('footer-text').textContent = settings.footerText;
     collectName = settings.collectName === 'true';
     if (collectName) document.getElementById('subscribe-bar').classList.add('show-name');
-    displayMode = settings.displayMode || 'catalog';
+    // events.html always shows catalog or series — single mode is reserved for homepage
+    displayMode = settings.displayMode === 'series' ? 'series' : 'catalog';
 
     allEvents = events;
     events.forEach(ev => { allEventsMap[ev.id] = ev; });

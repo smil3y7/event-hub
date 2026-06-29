@@ -200,6 +200,9 @@ function initNav() {
     const isMatch = href !== '/' && href !== '/index.html' && path.includes(href.replace('.html', ''));
     if (isHome || isMatch) a.classList.add('active');
   });
+  // Set copyright year dynamically
+  const yearEl = document.getElementById('footer-year');
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
 }
 
 // ── DYNAMIC OG META (for pages that know their event) ─────────────────────
