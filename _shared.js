@@ -2,8 +2,7 @@
 // Loaded via <script src="/_shared.js"> on every public page.
 
 // ── CONFIGURATION ─────────────────────────────────────────────────────────
-// Using var so pages that load _shared.js can safely redeclare API if needed
-var API = '/api'; // eslint-disable-line no-var
+const API = '/api';
 
 // Open Graph image — change this one URL to update og:image across all pages.
 // Use an absolute URL to a JPG/PNG for best social media compatibility.
@@ -24,9 +23,7 @@ const EVENT_TAGS = {
   themes: [
     { id: 'sanje', label: 'Sanje' },
     { id: 'lucidno-sanjanje', label: 'Lucidno sanjanje' },
-    { id: 'oobe', label: 'OOBE' },	
-    { id: 'izventelesne-izkusnje', label: 'Izventelesne izkušnje' },	
-	{ id: 'samanizem', label: 'Šamanizem' },
+    { id: 'samanizem', label: 'Šamanizem' },
     { id: 'zavest', label: 'Zavest' },
     { id: 'energija', label: 'Energija' },
     { id: 'telo', label: 'Telo' },

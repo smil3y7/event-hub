@@ -134,7 +134,13 @@ body::before {
   .site-nav-links.open { display: flex; }
   .nav-link { padding: 0.6rem 0.8rem; width: 100%; }
   .nav-link.cta { margin-left: 0; }
-  .nav-admin { display: none; }
+  /* Show admin link as text inside dropdown on mobile */
+  .nav-admin {
+    display: flex; width: 100%; border-radius: 8px;
+    justify-content: flex-start; padding: 0.6rem 0.8rem;
+    opacity: 1; font-size: 0.85rem; gap: 0.5rem;
+  }
+  .nav-admin::after { content: 'Admin'; font-family: var(--sans); }
 }
 
 /* ── HEADER ── */
@@ -311,6 +317,7 @@ body::before {
   background: var(--bg); border: 1px solid var(--border);
   border-radius: var(--radius); max-width: 640px; width: 100%;
   position: relative; animation: modalIn 0.2s ease-out;
+  overflow: visible;
 }
 @keyframes modalIn {
   from { opacity: 0; transform: translateY(10px); }
@@ -324,7 +331,24 @@ body::before {
   cursor: pointer; font-size: 1.1rem; z-index: 2;
 }
 .modal-close:hover { color: var(--text); border-color: var(--accent); }
-.modal-content { padding: 1.5rem; }
+.modal-content {
+  padding: 1.5rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.modal-content h2 {
+  font-size: clamp(1.3rem, 4vw, 1.9rem);
+  font-weight: 400; line-height: 1.2;
+  margin: 0.8rem 0 1rem;
+  color: var(--text);
+  font-family: var(--font);
+}
+.modal-content .desc,
+.modal-content p {
+  font-size: 1rem; line-height: 1.75; color: var(--text2);
+  white-space: pre-line; overflow-wrap: break-word;
+}
+.modal-content .event-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.8rem; }
 
 /* ── COLLAPSIBLE ── */
 .collapsible-trigger {
