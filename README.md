@@ -1,4 +1,4 @@
-# Sentria Events — MVP
+# Event Hub — MVP
 
 Sistem za zbiranje e-mail naslovov z upravljanjem dogodkov. Statični frontend + Vercel serverless API + Vercel KV (Redis).
 
@@ -9,26 +9,25 @@ index.html              javna stran (single/catalog/series prikaz, modal detajlo
 admin.html               admin panel (login, CRUD dogodkov, naročniki, nastavitve, uporabniki)
 unsubscribe.html          self-service stran za odjavo od e-novic
 api/
-  _lib.js                 skupne pomožne funkcije (CORS, JWT verify, rate limiting)
+  _lib.js                 skupne pomožne funkcije (CORS, JWT verify, rate limiting, normalizeRecord)
   _kv.js                   centraliziran Upstash Redis klient
   setup.js                 enkratni seed (zažene se ENKRAT po deployu)
-  subscribe.js              POST – shrani email naročnika (rate limited: 5/uro/IP)
-  unsubscribe.js              POST – odjava po e-mail naslovu (rate limited: 10/uro/IP)
+  subscribe.js              POST – prijava (?action=subscribe, privzeto) in odjava (?action=unsubscribe)
+                              (rate limited: 5/uro/IP prijava, 10/uro/IP odjava)
   events.js                    GET – javni seznam dogodkov + nastavitve
-  auth.js                       vse auth akcije v eni funkciji, routirano po ?action=
-                                  (login / change-password / add-user / me / set-name)
+  auth.js                       vse auth + user-management akcije v eni funkciji, routirano po ?action=
+                                  (login / change-password / add-user / me / set-name /
+                                   list-users / delete-user)
   admin/
     events.js                     GET/POST/DELETE – CRUD dogodkov (JWT zaščiteno)
-    subscribers.js                  GET – seznam naročnikov za UI
+    subscribers.js                  GET – seznam naročnikov (?format=csv za CSV izvoz)
     settings.js                       GET/PUT – način prikaza, vsebina strani
-    export.js                           GET – CSV izvoz naročnikov
-    users.js                              GET/DELETE – upravljanje uporabnikov (master only)
-    upload-image.js                         POST – nalaganje slike dogodka (Vercel Blob)
+    upload-image.js                     POST – nalaganje slike dogodka (Vercel Blob)
 vercel.json              CORS headers
 package.json              odvisnosti: @upstash/redis, @vercel/blob, bcryptjs, jsonwebtoken
 ```
 
-**Opomba o `api/auth.js`**: Vercel Hobby plan dovoli največ 12 serverless funkcij na deployment. Pet ločenih auth endpointov (login, change-password, add-user, me, set-name) je bilo združenih v eno datoteko z internim routingom po `?action=` query parametru. Projekt trenutno uporablja 11 od 12 dovoljenih funkcij — pri dodajanju novih endpointov v prihodnje razmisli o podobnem združevanju (npr. nove auth akcije gredo kot nov `case` v `auth.js`, ne kot nova datoteka).
+**Opomba o `api/auth.js`**: Vercel Hobby plan dovoli največ 12 serverless funkcij na deployment. Sorodne akcije so združene v skupne datoteke z internim routingom po `?action=`/`?format=` query parametru namesto ločenih datotek: `auth.js` pokriva vse auth + user-management akcije (bilo prej tudi `admin/users.js`), `subscribe.js` pokriva prijavo in odjavo (bilo prej tudi `unsubscribe.js`), `admin/subscribers.js` pokriva seznam in CSV izvoz (bilo prej tudi `admin/export.js`). Projekt trenutno uporablja **8 od 12** dovoljenih funkcij — pri dodajanju novih endpointov v prihodnje uporabi isti vzorec (nov `case`/query-param v obstoječi sorodni datoteki namesto nove datoteke), razen kadar gre za resnično drugačen tip telesa zahteve (npr. `upload-image.js` ostaja ločen zaradi multipart/binary parsanja).
 
 ## 🚀 Postavitev (deploy)
 
@@ -36,7 +35,7 @@ package.json              odvisnosti: @upstash/redis, @vercel/blob, bcryptjs, js
 ```bash
 git init
 git add .
-git commit -m "Sentria Events MVP"
+git commit -m "Event Hub MVP"
 # push na GitHub, nato poveži repo z Vercel (vercel.com/new)
 ```
 
@@ -107,7 +106,8 @@ Pojdi na `https://tvoja-domena.vercel.app/admin.html`, prijavi se z enim od zgor
 2. **JWT_SECRET**: mora biti dolg, naključen string — brez njega lahko kdorkoli ponaredi žetone.
 3. **`/api/setup`**: po prvem zagonu je smiselno bodisi (a) zbrisati `api/setup.js` in redeployati, bodisi (b) zamenjati `SETUP_SECRET` env spremenljivko na nekaj neuporabnega — endpoint sam preveri `kv.exists('user:master')` in zavrne ponovni zagon, a dodatna previdnost ne škodi.
 4. **CORS**: trenutno `Access-Control-Allow-Origin: *` — za produkcijo lahko v `vercel.json` omejiš na svojo domeno.
-5. **Slike dogodkov**: trenutno samo URL vnos (ni file uploada). Za upload bi potrebovali Vercel Blob Storage — lahko dodamo v naslednji iteraciji.
+5. **Rate limiting na prijavo**: `/api/auth?action=login` je omejen na 10 poskusov/uro/IP proti brute-force napadom na gesla.
+6. **CSV izvoz**: vrednosti, ki se začnejo z `=`, `+`, `-` ali `@` so zaščitene pred formula/CSV injection (spreadsheet aplikacije bi jih sicer lahko izvedle kot formulo).
 
 ## 🛠 Lokalni razvoj
 
@@ -120,9 +120,47 @@ Vercel CLI bo povprašal za povezavo s KV bazo (lahko uporabiš isto produkcijsk
 
 ## 📋 Naslednji koraki / ideje za V2
 
-- Upload slik (Vercel Blob)
 - Email potrditev (double opt-in) za GDPR skladnost
-- Unsubscribe link v vsakem mailu
-- Paginacija za catalog/series pri velikem številu eventov
+- Unsubscribe link v vsakem mailu (stran `/unsubscribe.html` že obstaja, treba jo je le linkati v BCC vabilih)
 - Audit log (kdo je kaj spremenil)
-- Rate limiting na `/api/subscribe` proti spamu
+- Preveriti/omejiti pravice vloge `editor` (trenutno ima enaka pooblastila kot `admin` na dogodkih/nastavitvah — glej CHANGELOG)
+
+## 📝 CHANGELOG — pregled kode (04.07.2026)
+
+Celovit pregled kode je odkril in odpravil naslednje:
+
+**Popravljeni bugi:**
+- `api/admin/events.js`: `tagThemes` ni bil na seznamu JSON-polj (za razliko od `api/events.js`), kar je pri urejanju dogodka v adminu tiho izbrisalo izbrane tematske oznake. Zdaj je seznam JSON-polj usklajen (in centraliziran v `_lib.js`).
+- `events.html` in `team.html`: skeleton loader je bil zapisan kot JS predloga (`${...}`) izven `<script>` oznake, zato se je ob nalaganju za trenutek prikazala surova koda namesto animacije nalaganja.
+- `admin.html`: gumbi za urejanje dogodka/člana ekipe (`onclick='fn(${JSON.stringify(...)})'`) so se pokvarili, če je besedilo vsebovalo narekovaj/apostrof — zdaj se dogodki/člani iščejo po ID-ju iz shranjenega seznama.
+- `admin.html`: ob nalaganju strani se je admin vmesnik za trenutek prikazal tudi z že poteklim/neveljavnim žetonom, preden ga je prva API zahteva zavrnila — zdaj se žeton preveri pred prikazom vmesnika.
+- `events.html`: lokalna kopija ikone globusa (`GLOBE_ICON`) je imela pokvarjeno SVG pot (drugačna od `index.html`) — posledica ročnega podvajanja iste kode na treh mestih.
+
+**Varnost:**
+- Dodan rate limiting na `/api/auth?action=login` (10 poskusov/uro/IP) — prej ga ni bilo.
+- Dodana zaščita pred CSV/formula injection pri izvozu naročnikov.
+- Dodan `escapeHtml()` na vse admin-vnešeno besedilo (naslovi, opisi, imena, bio), ki se izpisuje preko `innerHTML` na javnih straneh in v adminu — obramba v globino, tudi če se kdaj doda uporabnik z omejenimi pravicami.
+
+**Poenotenje kode (lažje vzdrževanje):**
+- `normalizeRecord()` je bila skoraj identično podvojena v 4 datotekah (in vzrok zgornjega tagThemes buga) — zdaj ena skupna implementacija v `api/_lib.js`.
+- `handleSubscribe()` je obstajala v 4 verzijah (1 neuporabljena v `_shared.js` + 3 skoraj identične kopije po straneh) — zdaj ena skupna funkcija.
+- Prikaz govorcev (speaker card HTML) je bil podvojen med `index.html` in `events.html` — zdaj skupna `renderSpeakerCards()` v `_shared.js`.
+- `GLOBE_ICON` je bil podvojen v treh datotekah — zdaj ena konstanta v `_shared.js`.
+- Neuporabljene (dead code) `skeletonCard`/`skeletonSingle`/`skeletonTeam` funkcije v `_shared.js` odstranjene.
+
+### Dopolnitev (isti dan, po povratni informaciji)
+
+**Popravljen bug:**
+- `events.html`: v modalu je gumb "Preberi več" razkril polno besedilo, ne da bi skril skrajšan predogled nad njim, zato je bil začetek besedila viden dvakrat. `toggleCollapsible()` zdaj sprejme opcijski `previewId` parameter in predogled pravilno skrije.
+
+**API konsolidacija** (Vercel Hobby dovoli 12 serverless funkcij, projekt jih je uporabljal 11/12):
+- `subscribe.js` + `unsubscribe.js` → združena v `subscribe.js` (`?action=unsubscribe`)
+- `admin/subscribers.js` + `admin/export.js` → združena v `admin/subscribers.js` (`?format=csv`)
+- `admin/users.js` → prestavljen v `auth.js` (`?action=list-users` / `?action=delete-user`)
+- Rezultat: **8/12** funkcij, 4 mesta prosta za prihodnjo rast (npr. Orbis iframe/postMessage integracija).
+
+**Redesign sticky subscribe vrstice** (bila prej vedno vidna čez celo širino, brez možnosti strnitve):
+- Zdaj ena skupna komponenta (`initSubscribeBar()` v `_shared.js`), injicirana v `#subscribe-bar-mount` na vseh treh javnih straneh — HTML markup ni več ročno podvojen.
+- Prikaže se šele po ~400px scrolla (ne tekmuje s prvim vtisom ob prihodu na stran).
+- Privzeto strnjena v tanek trak čez celo širino; klik razširi v poln obrazec.
+- Po uspešni prijavi se trajno skrije za tega obiskovalca (`localStorage`), saj ni razloga vztrajno spraševati nekoga, ki je že naročen.

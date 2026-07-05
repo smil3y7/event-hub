@@ -69,7 +69,7 @@ async function handleUnsubscribe(e) {
   msg.textContent = '';
 
   try {
-    const res = await fetch('/api/unsubscribe', {
+    const res = await fetch('/api/subscribe?action=unsubscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })

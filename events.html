@@ -73,7 +73,11 @@
   <!-- Skeleton -->
   <div id="skeleton-wrap">
     <div class="section-divider"><h2>&nbsp;</h2></div>
-    <div class="events-grid">${'<div class="skeleton-card"><div class="skeleton-img skel"></div><div class="skeleton-body"><div class="skel" style="height:12px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:18px;width:85%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:100%"></div></div></div>'.repeat(3)}</div>
+    <div class="events-grid">
+      <div class="skeleton-card"><div class="skeleton-img skel"></div><div class="skeleton-body"><div class="skel" style="height:12px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:18px;width:85%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:100%"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-img skel"></div><div class="skeleton-body"><div class="skel" style="height:12px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:18px;width:85%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:100%"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-img skel"></div><div class="skeleton-body"><div class="skel" style="height:12px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:18px;width:85%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:100%"></div></div></div>
+    </div>
   </div>
 
   <main id="main"></main>
@@ -86,14 +90,7 @@
 
 <button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Na vrh">↑</button>
 
-<div class="subscribe-bar" id="subscribe-bar">
-  <form class="subscribe-bar-inner" onsubmit="handleSubscribe(event)">
-    <div class="bar-msg" id="sub-msg-bar" style="display:none"></div>
-    <input type="text" class="sub-name name-field" placeholder="Ime">
-    <input type="email" class="sub-email" placeholder="E-mail za vabila na dogodke" required autocomplete="email">
-    <button type="submit">Prijavi se</button>
-  </form>
-</div>
+<div id="subscribe-bar-mount"></div>
 
 <script src="/_shared.js"></script>
 <script>
@@ -106,15 +103,23 @@ let visibleCount = PAGE_SIZE;
 let displayMode = 'catalog';
 let collectName = false;
 
-const GLOBE_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+// GLOBE_ICON now comes from /_shared.js (this page previously had its own
+// copy with a corrupted SVG path — visibly different icon from index.html).
 
-function toggleCollapsible(btn, bodyId) {
+// previewId is optional — pass it only when this trigger reveals a body that
+// duplicates a preview paragraph (the description case). The speaker-list
+// trigger has no preview, so it's called without a 3rd argument.
+function toggleCollapsible(btn, bodyId, previewId) {
   const isOpen = btn.classList.contains('open');
   btn.classList.toggle('open', !isOpen);
   btn.querySelector('.chevron').textContent = isOpen ? '▾' : '▴';
   const lbl = btn.querySelector('.btn-label');
   if (lbl) lbl.textContent = isOpen ? (btn.dataset.openLabel || 'Več') : (btn.dataset.closeLabel || 'Skrij');
   document.getElementById(bodyId)?.classList.toggle('open', !isOpen);
+  if (previewId) {
+    const preview = document.getElementById(previewId);
+    if (preview) preview.style.display = isOpen ? '' : 'none';
+  }
 }
 
 // Tag filters
@@ -198,8 +203,8 @@ function eventCardHtml(ev, isPast) {
     <article class="event-card${isPast ? ' is-past' : ''}" data-event-theme="${ev.colorTag||'oneiro-dark'}" onclick="openEventModal('${ev.id}')">
       ${renderImage(ev.imageUrl, 'card-img')}
       <div class="card-body">
-        <div class="card-meta"><span class="mini-tag"></span>${ev.date ? formatDate(ev.date) : ''}${ev.time ? ' · '+ev.time : ''}${ev.eventType==='recurring' ? ' · ↻ Serija' : ''}</div>
-        <h3>${ev.title}</h3>
+        <div class="card-meta"><span class="mini-tag"></span>${ev.date ? escapeHtml(formatDate(ev.date)) : ''}${ev.time ? ' · '+escapeHtml(ev.time) : ''}${ev.eventType==='recurring' ? ' · ↻ Serija' : ''}</div>
+        <h3>${escapeHtml(ev.title)}</h3>
         <p class="card-desc">${ev.description || ''}</p>
         ${tags.length ? `<div class="tag-pills-row" style="margin-top:0.6rem">${renderTagPills(tags, true)}</div>` : ''}
       </div>
@@ -224,31 +229,20 @@ function openEventModal(id) {
     ${renderImage(ev.imageUrl, 'event-image')}
     <div class="event-meta">${eventBadges(ev)}</div>
     ${tags.length ? `<div class="tag-pills-row">${renderTagPills(tags, true)}</div>` : ''}
-    <h2 style="font-size:clamp(1.4rem,4vw,2rem);font-weight:400;margin:1rem 0 1.2rem;line-height:1.2">${ev.title}</h2>
+    <h2 style="font-size:clamp(1.4rem,4vw,2rem);font-weight:400;margin:1rem 0 1.2rem;line-height:1.2">${escapeHtml(ev.title)}</h2>
     ${isLong ? `
       <p class="desc-preview" id="mdp-${uid}">${preview}</p>
       <div class="collapsible-body" id="${descFull}"><p style="font-size:1.05rem;line-height:1.75;color:var(--text2);white-space:pre-line">${ev.description}</p></div>
-      <button class="collapsible-trigger" data-open-label="Preberi več" data-close-label="Skrij" onclick="toggleCollapsible(this,'${descFull}')">
+      <button class="collapsible-trigger" data-open-label="Preberi več" data-close-label="Skrij" onclick="toggleCollapsible(this,'${descFull}','mdp-${uid}')">
         <span class="btn-label">Preberi več</span><span class="chevron">▾</span>
       </button>` : `<p style="font-size:1.05rem;line-height:1.75;color:var(--text2);white-space:pre-line">${ev.description||''}</p>`}
-    ${ev.locationUrl ? `<a class="location-link" href="${ev.locationUrl}" target="_blank" rel="noopener">↗ ${ev.isOnline==='true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
+    ${ev.locationUrl ? `<a class="location-link" href="${escapeHtml(ev.locationUrl)}" target="_blank" rel="noopener">↗ ${ev.isOnline==='true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
     ${speakers.length ? `
       <div style="margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--border)">
         <button class="collapsible-trigger" data-open-label="Predavatelji" data-close-label="Skrij predavatelje" onclick="toggleCollapsible(this,'${spBody}')">
           <span class="btn-label">Predavatelji</span><span class="chevron">▾</span>
         </button>
-        <div class="collapsible-body" id="${spBody}">
-          ${speakers.map(s => `
-            <div style="display:flex;gap:0.8rem;align-items:flex-start;margin-top:1rem">
-              ${s.imageUrl ? `<img src="${s.imageUrl}" alt="${s.name}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" onerror="this.style.display='none'">` : ''}
-              <div>
-                <div style="font-size:0.92rem;color:var(--text)">${s.name}</div>
-                ${s.role ? `<div style="font-size:0.76rem;color:var(--accent2);font-family:var(--sans)">${s.role}</div>` : ''}
-                ${s.bio ? `<p style="font-size:0.84rem;color:var(--text2);line-height:1.6;margin:0.3rem 0 0">${s.bio}</p>` : ''}
-                ${s.link ? `<a href="${s.link}" target="_blank" rel="noopener" style="font-size:0.8rem;color:var(--accent);text-decoration:none;font-family:var(--sans);display:inline-flex;align-items:center;gap:2px;margin-top:0.3rem">${GLOBE_ICON}Spletna stran</a>` : ''}
-              </div>
-            </div>`).join('')}
-        </div>
+        <div class="collapsible-body" id="${spBody}">${renderSpeakerCards(speakers)}</div>
       </div>` : ''}`;
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -276,8 +270,8 @@ function renderMain() {
       <div class="timeline-item${!isUpcoming(ev.date) ? ' is-past' : ''}" data-event-theme="${ev.colorTag||'oneiro-dark'}" onclick="openEventModal('${ev.id}')">
         <div class="timeline-dot${isUpcoming(ev.date) ? ' future' : ''}">${ev.date ? formatDateShort(ev.date) : String(i+1).padStart(2,'0')}</div>
         <div class="timeline-body">
-          <h3>${ev.title}</h3>
-          <div class="tl-meta">${ev.date ? formatDate(ev.date) : ''}${ev.time ? ' · '+ev.time : ''}${ev.isOnline==='true' ? ' · Online' : ev.location ? ' · '+ev.location : ''}</div>
+          <h3>${escapeHtml(ev.title)}</h3>
+          <div class="tl-meta">${ev.date ? escapeHtml(formatDate(ev.date)) : ''}${ev.time ? ' · '+escapeHtml(ev.time) : ''}${ev.isOnline==='true' ? ' · Online' : ev.location ? ' · '+escapeHtml(ev.location) : ''}</div>
           <p class="tl-desc">${ev.description || ''}</p>
         </div>
       </div>`).join('')}</div>`;
@@ -296,24 +290,7 @@ function renderMain() {
 
 function loadMore() { visibleCount += PAGE_SIZE; renderMain(); }
 
-async function handleSubscribe(e) {
-  e.preventDefault();
-  const btn = e.target.querySelector('[type=submit]');
-  const msg = document.getElementById('sub-msg-bar');
-  btn.disabled = true; msg.style.display = 'none';
-  try {
-    const res = await fetch(`${API}/subscribe`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: e.target.querySelector('.sub-email').value.trim(), name: e.target.querySelector('.sub-name')?.value?.trim() || '' })
-    });
-    const data = await res.json();
-    msg.style.display = 'block'; msg.className = 'bar-msg '+(data.ok?'ok':'error');
-    msg.textContent = data.ok ? '✦ Prijava uspešna.' : (data.error||'Napaka.');
-    if (data.ok) e.target.reset();
-    setTimeout(() => { msg.style.display = 'none'; }, 4000);
-  } catch { msg.style.display = 'block'; msg.className = 'bar-msg error'; msg.textContent = 'Napaka pri povezavi.'; }
-  finally { btn.disabled = false; }
-}
+// handleSubscribe() now comes from /_shared.js — used identically on all 3 public pages.
 
 async function init() {
   try {
@@ -325,7 +302,7 @@ async function init() {
     if (settings.siteSubtitle) document.getElementById('site-subtitle').textContent = settings.siteSubtitle;
     if (settings.footerText) document.getElementById('footer-text').textContent = settings.footerText;
     collectName = settings.collectName === 'true';
-    if (collectName) document.getElementById('subscribe-bar').classList.add('show-name');
+    if (collectName) setSubscribeBarNameField(true);
     // events.html always shows catalog or series — single mode is reserved for homepage
     displayMode = settings.displayMode === 'series' ? 'series' : 'catalog';
 
@@ -358,6 +335,7 @@ async function init() {
 
 initNav();
 initBackToTop();
+initSubscribeBar();
 init();
 </script>
 

@@ -608,7 +608,8 @@ async function handleLogin(e) {
     localStorage.setItem('ev_token', token);
     localStorage.setItem('ev_role', userRole);
     localStorage.setItem('ev_username', username);
-    enterApp();
+    const me = await apiCall('/auth?action=me').catch(() => null);
+    enterApp(me);
   } catch {
     err.textContent = 'Napaka pri povezavi.';
     btn.disabled = false;
@@ -638,7 +639,8 @@ async function handleForcedPasswordChange(e) {
     localStorage.setItem('ev_role', userRole);
     localStorage.setItem('ev_username', username);
     document.getElementById('change-pw-screen').style.display = 'none';
-    enterApp();
+    const me = await apiCall('/auth?action=me').catch(() => null);
+    enterApp(me);
     showToast('Geslo uspešno nastavljeno.');
   } catch {
     err.textContent = 'Napaka pri povezavi.';
@@ -656,27 +658,20 @@ function logout() {
   document.getElementById('login-form').reset();
 }
 
-function enterApp() {
+function enterApp(meData) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('change-pw-screen').style.display = 'none';
   document.getElementById('app').classList.add('active');
   document.getElementById('who-label').textContent = `${username} (${userRole})`;
   if (userRole === 'master') document.getElementById('users-tab-btn').style.display = '';
+  if (meData?.displayName) {
+    document.getElementById('who-label').textContent = `${meData.displayName} (${userRole})`;
+    document.getElementById('name-input').value = meData.displayName;
+  }
   loadEvents();
   loadSettings();
-  loadMyName();
   loadSubscribers();
   if (userRole === 'master') loadUsers();
-}
-
-async function loadMyName() {
-  try {
-    const data = await apiCall('/auth?action=me');
-    if (data.displayName) {
-      document.getElementById('who-label').textContent = `${data.displayName} (${userRole})`;
-      document.getElementById('name-input').value = data.displayName;
-    }
-  } catch (e) { /* non-critical, ignore */ }
 }
 
 /* ── TABS ── */
@@ -686,11 +681,20 @@ function switchTab(tab) {
 }
 
 /* ── EVENTS ── */
+let currentEventsList = []; // kept so edit/delete buttons can look events up by id
+                              // instead of embedding a full JSON blob in an onclick attribute
+                              // (that approach broke whenever a title/description contained a quote)
 async function loadEvents() {
   try {
     const data = await apiCall('/admin/events');
-    renderEventsList(data.events || []);
+    currentEventsList = data.events || [];
+    renderEventsList(currentEventsList);
   } catch (e) { showToast(e.message, true); }
+}
+
+function editEventById(id) {
+  const ev = currentEventsList.find(e => e.id === id);
+  if (ev) editEvent(ev);
 }
 
 const COLOR_SWATCHES = {
@@ -706,15 +710,15 @@ function renderEventsList(events) {
   events.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   el.innerHTML = events.map(ev => `
     <div class="event-row">
-      ${ev.imageUrl ? `<img class="thumb" src="${ev.imageUrl}" onerror="this.outerHTML='<div class=&quot;thumb&quot;>☽</div>'">` : '<div class="thumb">☽</div>'}
+      ${ev.imageUrl ? `<img class="thumb" src="${escapeHtml(ev.imageUrl)}" onerror="this.outerHTML='<div class=&quot;thumb&quot;>☽</div>'">` : '<div class="thumb">☽</div>'}
       <div class="info">
-        <h3>${ev.title}</h3>
-        <div class="meta">${ev.date || 'brez datuma'}${ev.time ? ' · ' + ev.time : ''} ${ev.isOnline === 'true' ? '· 🔗 Online' : ev.location ? '· 📍 ' + ev.location : ''}${ev.eventType === 'recurring' ? ' · ↻ Serija' : ''}</div>
+        <h3>${escapeHtml(ev.title)}</h3>
+        <div class="meta">${escapeHtml(ev.date || 'brez datuma')}${ev.time ? ' · ' + escapeHtml(ev.time) : ''} ${ev.isOnline === 'true' ? '· 🔗 Online' : ev.location ? '· 📍 ' + escapeHtml(ev.location) : ''}${ev.eventType === 'recurring' ? ' · ↻ Serija' : ''}</div>
       </div>
-      <div class="color-tag-opt" style="width:18px;height:18px;border-radius:5px;flex-shrink:0;background:${COLOR_SWATCHES[ev.colorTag] || COLOR_SWATCHES['oneiro-dark']}" title="${ev.colorTag || 'oneiro-dark'}"></div>
+      <div class="color-tag-opt" style="width:18px;height:18px;border-radius:5px;flex-shrink:0;background:${COLOR_SWATCHES[ev.colorTag] || COLOR_SWATCHES['oneiro-dark']}" title="${escapeHtml(ev.colorTag || 'oneiro-dark')}"></div>
       <span class="status ${ev.published === 'true' ? 'pub' : 'draft'}">${ev.published === 'true' ? 'Objavljeno' : 'Osnutek'}</span>
       <div class="row-actions">
-        <button class="icon-btn" title="Uredi" onclick='editEvent(${JSON.stringify(ev)})'>✎</button>
+        <button class="icon-btn" title="Uredi" onclick="editEventById('${ev.id}')">✎</button>
         <button class="icon-btn del" title="Izbriši" onclick="deleteEvent('${ev.id}')">✕</button>
       </div>
     </div>
@@ -1133,23 +1137,31 @@ async function saveSettings() {
 }
 
 /* ── TEAM MEMBERS ── */
+let currentTeamMembers = []; // kept so the edit button can look members up by id
+                               // (see editEventById() above for why — same fix here)
 function renderTeamList(members) {
+  currentTeamMembers = members;
   const el = document.getElementById('team-list');
   if (!members.length) { el.innerHTML = '<p class="empty-hint">Še ni članov. Dodaj prvega zgoraj.</p>'; return; }
   el.innerHTML = members.map(m => `
     <div class="user-row">
       <div class="uinfo" style="display:flex; align-items:center; gap:0.8rem">
-        ${m.imageUrl ? `<img src="${m.imageUrl}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : ''}
+        ${m.imageUrl ? `<img src="${escapeHtml(m.imageUrl)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : ''}
         <div>
-          <span>${m.name}</span>${m.role ? `<span class="role">${m.role}</span>` : ''}
+          <span>${escapeHtml(m.name)}</span>${m.role ? `<span class="role">${escapeHtml(m.role)}</span>` : ''}
         </div>
       </div>
       <div style="display:flex; gap:0.4rem">
-        <button class="icon-btn" onclick='editTeamMember(${JSON.stringify(m)})' title="Uredi">✎</button>
+        <button class="icon-btn" onclick="editTeamMemberById('${m.id}')" title="Uredi">✎</button>
         <button class="icon-btn del" onclick="deleteTeamMember('${m.id}')" title="Izbriši">✕</button>
       </div>
     </div>
   `).join('');
+}
+
+function editTeamMemberById(id) {
+  const m = currentTeamMembers.find(x => x.id === id);
+  if (m) editTeamMember(m);
 }
 
 function editTeamMember(m) {
@@ -1244,7 +1256,7 @@ async function handleChangePassword(e) {
 /* ── USERS (master) ── */
 async function loadUsers() {
   try {
-    const data = await apiCall('/admin/users');
+    const data = await apiCall('/auth?action=list-users');
     renderUsersList(data.users || []);
   } catch (e) { /* silently ignore if not master */ }
 }
@@ -1254,8 +1266,8 @@ function renderUsersList(users) {
   if (!users.length) { el.innerHTML = '<p class="empty-hint">Ni dodatnih uporabnikov.</p>'; return; }
   el.innerHTML = users.map(u => `
     <div class="user-row">
-      <div class="uinfo">${u.username}<span class="role">${u.role}</span>${u.mustChangePassword === 'true' ? '<span class="badge-mc">⚿ čaka na menjavo gesla</span>' : ''}</div>
-      ${u.username !== username ? `<button class="icon-btn del" onclick="deleteUser('${u.username}')">✕</button>` : ''}
+      <div class="uinfo">${escapeHtml(u.username)}<span class="role">${escapeHtml(u.role)}</span>${u.mustChangePassword === 'true' ? '<span class="badge-mc">⚿ čaka na menjavo gesla</span>' : ''}</div>
+      ${u.username !== username ? `<button class="icon-btn del" onclick="deleteUser('${escapeHtml(u.username)}')">✕</button>` : ''}
     </div>
   `).join('');
 }
@@ -1283,7 +1295,7 @@ async function handleAddUser(e) {
 async function deleteUser(u) {
   if (!confirm(`Izbrišem uporabnika "${u}"?`)) return;
   try {
-    await apiCall(`/admin/users?username=${encodeURIComponent(u)}`, { method: 'DELETE' });
+    await apiCall(`/auth?action=delete-user&username=${encodeURIComponent(u)}`, { method: 'DELETE' });
     showToast('Uporabnik izbrisan.');
     loadUsers();
   } catch (e) { showToast(e.message, true); }
@@ -1307,7 +1319,7 @@ function renderSubscribersList(subs) {
   el.innerHTML = `<p style="color:var(--text3); font-size:0.82rem; margin-bottom:0.8rem">${subs.length} naročnik${subs.length === 1 ? '' : subs.length < 5 ? 'i' : 'ov'}</p>` +
     subs.map(s => `
     <div class="user-row">
-      <div class="uinfo">${s.email}${s.name ? `<span class="role">${s.name}</span>` : ''}</div>
+      <div class="uinfo">${escapeHtml(s.email)}${s.name ? `<span class="role">${escapeHtml(s.name)}</span>` : ''}</div>
       <span style="color:var(--text3); font-size:0.76rem">${s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString('sl-SI') : ''}</span>
     </div>
   `).join('');
@@ -1323,7 +1335,7 @@ function copyEmails() {
 
 /* ── EXPORT ── */
 function exportCsv() {
-  fetch(`${API}/admin/export`, { headers: authHeaders() })
+  fetch(`${API}/admin/subscribers?format=csv`, { headers: authHeaders() })
     .then(res => res.blob())
     .then(blob => {
       const url = URL.createObjectURL(blob);
@@ -1336,7 +1348,20 @@ function exportCsv() {
 }
 
 /* ── INIT ── */
-if (token) { enterApp(); } else { document.getElementById('login-screen').style.display = 'flex'; }
+// Verify the stored token is actually still valid before showing the app —
+// previously enterApp() ran immediately on any stored token, so an expired
+// or tampered token would flash the whole admin UI before the first API
+// call bounced it back to the login screen a moment later.
+async function initAuth() {
+  if (!token) { document.getElementById('login-screen').style.display = 'flex'; return; }
+  try {
+    const data = await apiCall('/auth?action=me'); // throws + calls logout() internally on 401
+    enterApp(data);
+  } catch {
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+}
+initAuth();
 toggleLocationLabel();
 renderSpeakerRows();
 initTagPickers();

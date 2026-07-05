@@ -94,21 +94,14 @@
 
 <button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Na vrh">↑</button>
 
-<div class="subscribe-bar" id="subscribe-bar">
-  <form class="subscribe-bar-inner" id="subscribe-form" onsubmit="handleSubscribe(event, collectName)">
-    <div class="bar-msg" id="sub-msg-bar" style="display:none"></div>
-    <input type="text" class="sub-name name-field" placeholder="Ime">
-    <input type="email" class="sub-email" placeholder="E-mail za vabila na dogodke" required autocomplete="email">
-    <button type="submit">Prijavi se</button>
-  </form>
-</div>
+<div id="subscribe-bar-mount"></div>
 
 <script src="/_shared.js"></script>
 <script>
 const PREVIEW_LENGTH = 3; // max upcoming events on homepage
 let collectName = false;
 
-const GLOBE_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+// GLOBE_ICON and speakerListHtml() now come from /_shared.js — shared with events.html.
 
 function toggleDesc(btn, previewId, fullId) {
   const isOpen = btn.classList.contains('open');
@@ -129,27 +122,6 @@ function toggleSpeakers(btn, bodyId) {
   document.getElementById(bodyId).classList.toggle('open', !isOpen);
 }
 
-function speakerListHtml(speakers, bodyId) {
-  if (!speakers.length) return '';
-  const html = speakers.map(s => `
-    <div style="display:flex;gap:0.8rem;align-items:flex-start;margin-bottom:1rem">
-      ${s.imageUrl ? `<img src="${s.imageUrl}" alt="${s.name}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" onerror="this.style.display='none'">` : ''}
-      <div>
-        <div style="font-size:0.92rem;color:var(--text)">${s.name}</div>
-        ${s.role ? `<div style="font-size:0.76rem;color:var(--accent2);font-family:var(--sans)">${s.role}</div>` : ''}
-        ${s.bio ? `<p style="font-size:0.84rem;color:var(--text2);line-height:1.6;margin:0.3rem 0 0">${s.bio}</p>` : ''}
-        ${s.link ? `<a href="${s.link}" target="_blank" rel="noopener" style="font-size:0.8rem;color:var(--accent);text-decoration:none;font-family:var(--sans);display:inline-flex;align-items:center;gap:2px;margin-top:0.3rem">${GLOBE_ICON}Spletna stran</a>` : ''}
-      </div>
-    </div>`).join('');
-  const uid = Math.random().toString(36).slice(2,7);
-  const bid = bodyId || ('sp-' + uid);
-  return `
-    <button class="collapsible-trigger" onclick="toggleSpeakers(this,'${bid}')">
-      <span class="btn-label">Predavatelji</span><span class="chevron">▾</span>
-    </button>
-    <div class="collapsible-body" id="${bid}">${html}</div>`;
-}
-
 function eventHtml(ev, idx) {
   const speakers = parseSpeakers(ev);
   const tags = parseTags(ev);
@@ -165,7 +137,7 @@ function eventHtml(ev, idx) {
       ${renderImage(ev.imageUrl, 'event-image')}
       <div class="event-meta">${eventBadges(ev)}</div>
       ${tags.length ? `<div class="tag-pills-row">${renderTagPills(tags)}</div>` : ''}
-      <h2>${ev.title}</h2>
+      <h2>${escapeHtml(ev.title)}</h2>
       ${isLong ? `
         <p class="desc-preview" id="${descId}">${preview}</p>
         <div class="collapsible-body" id="${descFull}">
@@ -174,7 +146,7 @@ function eventHtml(ev, idx) {
         <button class="collapsible-trigger" onclick="toggleDesc(this,'${descId}','${descFull}')">
           <span class="btn-label">Preberi več</span><span class="chevron">▾</span>
         </button>` : `<p class="desc-preview">${ev.description || ''}</p>`}
-      ${ev.locationUrl ? `<a class="location-link" href="${ev.locationUrl}" target="_blank" rel="noopener">↗ ${ev.isOnline === 'true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
+      ${ev.locationUrl ? `<a class="location-link" href="${escapeHtml(ev.locationUrl)}" target="_blank" rel="noopener">↗ ${ev.isOnline === 'true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
       ${speakerListHtml(speakers)}
     </div>`;
 }
@@ -203,7 +175,7 @@ async function init() {
     }
 
     collectName = settings.collectName === 'true';
-    if (collectName) document.getElementById('subscribe-bar').classList.add('show-name');
+    setSubscribeBarNameField(collectName);
 
     const upcoming = events
       .filter(e => e.published === 'true' && isUpcoming(e.date))
@@ -233,32 +205,11 @@ async function init() {
   }
 }
 
-// Subscribe — uses shared handler but needs local msg element
-async function handleSubscribe(e) {
-  e.preventDefault();
-  const btn = e.target.querySelector('[type=submit]');
-  const msg = document.getElementById('sub-msg-bar');
-  const email = e.target.querySelector('.sub-email').value.trim();
-  const name = e.target.querySelector('.sub-name')?.value?.trim() || '';
-  btn.disabled = true;
-  msg.style.display = 'none';
-  try {
-    const res = await fetch(`${API}/subscribe`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, name })
-    });
-    const data = await res.json();
-    msg.style.display = 'block';
-    msg.className = 'bar-msg ' + (data.ok ? 'ok' : 'error');
-    msg.textContent = data.ok ? '✦ Prijava uspešna.' : (data.error || 'Napaka.');
-    if (data.ok) e.target.reset();
-    setTimeout(() => { msg.style.display = 'none'; }, 4000);
-  } catch { msg.style.display = 'block'; msg.className = 'bar-msg error'; msg.textContent = 'Napaka pri povezavi.'; }
-  finally { btn.disabled = false; }
-}
+// handleSubscribe() now comes from /_shared.js — used identically on all 3 public pages.
 
 initNav();
 initBackToTop();
+initSubscribeBar();
 init();
 </script>
 </body>

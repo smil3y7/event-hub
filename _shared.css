@@ -249,14 +249,34 @@ body::before {
 .badge.online { color: var(--accent); border-color: var(--accent); }
 .badge.recurring { color: var(--accent2); border-color: var(--accent2); }
 
-/* ── SUBSCRIBE BAR (sticky) ── */
+/* ── SUBSCRIBE BAR (sticky, shared component — see initSubscribeBar() in _shared.js) ── */
 .subscribe-bar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-  background: var(--bg2); border-top: 1px solid var(--border); padding: 0.8rem 1.5rem;
+  background: var(--bg2); border-top: 1px solid var(--border);
+  transform: translateY(100%); transition: transform 0.35s ease;
 }
+.subscribe-bar.visible { transform: translateY(0); }
+
+/* Collapsed state: just a slim, low-commitment tab spanning the width */
+.subscribe-bar-tab {
+  display: none; width: 100%; background: none; border: none; cursor: pointer;
+  color: var(--text2); font-family: var(--sans); font-size: 0.85rem;
+  padding: 0.6rem 1.5rem; align-items: center; justify-content: center; gap: 0.4rem;
+  transition: color 0.15s;
+}
+.subscribe-bar-tab:hover { color: var(--accent); }
+.subscribe-bar.collapsed .subscribe-bar-tab { display: flex; }
+.subscribe-bar.collapsed .subscribe-bar-inner { display: none; }
+
+.subscribe-bar-collapse {
+  flex-shrink: 0; background: none; border: none; color: var(--text3);
+  cursor: pointer; font-size: 0.9rem; padding: 0.4rem 0.2rem;
+}
+.subscribe-bar-collapse:hover { color: var(--text); }
+
 .subscribe-bar-inner {
   max-width: 680px; margin: 0 auto; display: flex; gap: 0.6rem;
-  align-items: center; position: relative;
+  align-items: center; position: relative; padding: 0.8rem 1.5rem;
 }
 .subscribe-bar input {
   flex: 1; min-width: 0; background: var(--bg3); border: 1px solid var(--border);
