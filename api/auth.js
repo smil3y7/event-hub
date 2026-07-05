@@ -1,9 +1,10 @@
-// api/auth.js — merged auth endpoint (login, change-password, add-user, me, set-name)
+// api/auth.js — merged auth + user-management endpoint
+// (login, change-password, add-user, me, set-name, list-users, delete-user)
 // Routed by ?action= query param to keep total serverless function count under Vercel Hobby's 12-function limit.
 import { kv } from './_kv.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { cors, verifyJWT, ok, err } from './_lib.js';
+import { cors, verifyJWT, ok, err, getClientIp, checkRateLimit } from './_lib.js';
 
 export default async function handler(req, res) {
   cors(res);
@@ -17,12 +18,21 @@ export default async function handler(req, res) {
     case 'add-user': return handleAddUser(req, res);
     case 'me': return handleMe(req, res);
     case 'set-name': return handleSetName(req, res);
+    case 'list-users': return handleListUsers(req, res);
+    case 'delete-user': return handleDeleteUser(req, res);
     default: return err(res, 'Unknown or missing action', 400);
   }
 }
 
 async function handleLogin(req, res) {
   if (req.method !== 'POST') return err(res, 'Method not allowed', 405);
+
+  // Rate limit by IP to make password brute-forcing impractical. Kept
+  // generous (10/hour) so a legitimate admin fumbling their password a few
+  // times in a row never gets locked out, while still stopping automated guessing.
+  const ip = getClientIp(req);
+  const allowed = await checkRateLimit(`ratelimit:login:${ip}`, 10, 3600);
+  if (!allowed) return err(res, 'Preveč poskusov prijave. Poskusi znova čez nekaj časa.', 429);
 
   const { username, password } = req.body || {};
   if (!username || !password) return err(res, 'Missing credentials');
@@ -128,4 +138,38 @@ async function handleSetName(req, res) {
   await kv.hset(`user:${caller.username}`, { displayName: cleaned });
 
   return ok(res, { displayName: cleaned });
+}
+
+// ── USER MANAGEMENT (master only) — previously api/admin/users.js ──────────
+async function handleListUsers(req, res) {
+  if (req.method !== 'GET') return err(res, 'Method not allowed', 405);
+
+  let caller;
+  try { caller = verifyJWT(req); } catch { return err(res, 'Unauthorized', 401); }
+  if (caller.role !== 'master') return err(res, 'Forbidden', 403);
+
+  const usernames = await kv.smembers('users');
+  const users = (await Promise.all(
+    (usernames || []).map(async u => {
+      const data = await kv.hgetall(`user:${u}`);
+      if (!data) return null;
+      return { username: u, role: String(data.role || ''), mustChangePassword: String(data.mustChangePassword) === 'true' ? 'true' : 'false' };
+    })
+  )).filter(Boolean);
+  return ok(res, { users });
+}
+
+async function handleDeleteUser(req, res) {
+  if (req.method !== 'DELETE') return err(res, 'Method not allowed', 405);
+
+  let caller;
+  try { caller = verifyJWT(req); } catch { return err(res, 'Unauthorized', 401); }
+  if (caller.role !== 'master') return err(res, 'Forbidden', 403);
+
+  const { username } = req.query;
+  if (!username) return err(res, 'Missing username');
+  if (username === caller.username) return err(res, 'Cannot delete yourself');
+  await kv.del(`user:${username}`);
+  await kv.srem('users', username);
+  return ok(res, { deleted: username });
 }

@@ -1,35 +1,15 @@
 // api/admin/settings.js
 import { kv } from '../_kv.js';
-import { cors, verifyJWT, ok, err } from '../_lib.js';
+import { cors, verifyJWT, ok, err, normalizeRecord, safeParseJsonArray } from '../_lib.js';
 import { randomUUID } from 'crypto';
 
 const ALLOWED_MODES = ['single', 'catalog', 'series'];
+const SETTINGS_JSON_FIELDS = ['teamMembers'];
 
-// Safely parse teamMembers from raw KV — Upstash may return already-deserialized array.
-function safeParseMembers(raw) {
-  const v = raw?.teamMembers;
-  if (!v) return [];
-  if (Array.isArray(v)) return v;
-  if (typeof v === 'object' && v !== null) return Object.values(v);
-  try { return JSON.parse(v); } catch { return []; }
-}
-
-// Normalize all other hash fields back to strings for consistent frontend use.
-function normalizeSettings(raw) {
-  if (!raw) return {};
-  const out = {};
-  for (const [k, v] of Object.entries(raw)) {
-    if (k === 'teamMembers') {
-      // re-stringify in case Upstash returned an array
-      out[k] = Array.isArray(v) || (typeof v === 'object' && v !== null)
-        ? JSON.stringify(v)
-        : (v == null ? '[]' : String(v));
-    } else {
-      out[k] = v == null ? '' : String(v);
-    }
-  }
-  return out;
-}
+// Thin wrappers kept so the rest of this file reads the same as before —
+// both now delegate to the single shared implementation in _lib.js.
+const safeParseMembers = (raw) => safeParseJsonArray(raw?.teamMembers);
+const normalizeSettings = (raw) => raw ? normalizeRecord(raw, SETTINGS_JSON_FIELDS) : {};
 
 export default async function handler(req, res) {
   cors(res);

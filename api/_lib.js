@@ -40,3 +40,42 @@ export async function checkRateLimit(key, maxRequests, windowSeconds) {
   }
   return count <= maxRequests;
 }
+
+// ── SHARED RECORD NORMALIZATION ──────────────────────────────────────────
+// Upstash auto-deserializes JSON-looking string values back into arrays/objects
+// on read. Since all our hash fields are meant to be flat strings (with a few
+// designated JSON-array fields), we normalize every record the same way
+// everywhere it's read, so behavior can never drift between endpoints again.
+//
+// jsonFields: field names that should always come back out as a JSON string
+// (e.g. 'speakers', 'tagThemes', 'teamMembers') rather than a plain String().
+export function normalizeRecord(record, jsonFields = []) {
+  if (!record) return record;
+  const out = {};
+  for (const [k, v] of Object.entries(record)) {
+    if (jsonFields.includes(k)) {
+      if (Array.isArray(v) || (typeof v === 'object' && v !== null)) {
+        out[k] = JSON.stringify(v);
+      } else {
+        out[k] = v === null || v === undefined ? '[]' : String(v);
+      }
+    } else {
+      out[k] = v === null || v === undefined ? '' : String(v);
+    }
+  }
+  return out;
+}
+
+// Safely coerce a value that might already be an array/object (Upstash
+// auto-deserialization), a JSON string, or empty/nullish, into a plain array.
+export function safeParseJsonArray(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'object') return Object.values(v);
+  try {
+    const parsed = JSON.parse(v);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}

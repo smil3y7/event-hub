@@ -1,34 +1,12 @@
 // api/events.js — public endpoint
 import { kv } from './_kv.js';
-import { cors, ok, err } from './_lib.js';
+import { cors, ok, err, normalizeRecord, safeParseJsonArray } from './_lib.js';
 
 // JSON array fields that Upstash deserializes — re-stringify them.
-const JSON_ARRAY_FIELDS = new Set(['teamMembers', 'speakers', 'tagThemes']);
-
-function normalizeRecord(record) {
-  if (!record) return record;
-  const out = {};
-  for (const [k, v] of Object.entries(record)) {
-    if (JSON_ARRAY_FIELDS.has(k)) {
-      if (Array.isArray(v) || (typeof v === 'object' && v !== null)) {
-        out[k] = JSON.stringify(v);
-      } else {
-        out[k] = v === null || v === undefined ? '[]' : String(v);
-      }
-    } else {
-      out[k] = v === null || v === undefined ? '' : String(v);
-    }
-  }
-  return out;
-}
-
-function parseTeamMembers(settings) {
-  const v = settings?.teamMembers;
-  if (!v) return [];
-  if (Array.isArray(v)) return v;
-  if (typeof v === 'object') return Object.values(v);
-  try { return JSON.parse(v); } catch { return []; }
-}
+// Kept in one place (this array) and reused for both events and settings so
+// this list can never drift out of sync with api/admin/events.js again.
+const EVENT_JSON_FIELDS = ['speakers', 'tagThemes'];
+const SETTINGS_JSON_FIELDS = ['teamMembers'];
 
 export default async function handler(req, res) {
   cors(res);
@@ -44,13 +22,13 @@ export default async function handler(req, res) {
 
   const ids = await kv.smembers('events');
   const settings = await getSettings(kv);
-  const teamMembers = parseTeamMembers(settings);
+  const teamMembers = safeParseJsonArray(settings?.teamMembers);
 
   if (!ids || ids.length === 0) return ok(res, { events: [], settings, teamMembers });
 
   const events = (await Promise.all(
     ids.map(id => kv.hgetall(`event:${id}`))
-  )).filter(Boolean).map(normalizeRecord).sort((a, b) => {
+  )).filter(Boolean).map(r => normalizeRecord(r, EVENT_JSON_FIELDS)).sort((a, b) => {
     const da = a.date || a.createdAt || '';
     const db = b.date || b.createdAt || '';
     return da.localeCompare(db);
@@ -61,7 +39,7 @@ export default async function handler(req, res) {
 
 async function getSettings(kv) {
   const s = await kv.hgetall('settings');
-  return s ? normalizeRecord(s) : {
+  return s ? normalizeRecord(s, SETTINGS_JSON_FIELDS) : {
     displayMode: 'single',
     siteTitle: 'Events',
     siteSubtitle: '',

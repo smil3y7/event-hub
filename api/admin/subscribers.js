@@ -1,15 +1,17 @@
-// api/admin/subscribers.js
+// api/admin/subscribers.js — merged subscriber list + CSV export
+// Routed by ?format= (default: json list, ?format=csv: file download) — both
+// read the exact same `subscriber:*` records, so this saves a function slot.
 import { kv } from '../_kv.js';
-import { cors, verifyJWT, ok, err } from '../_lib.js';
+import { cors, verifyJWT, ok, err, normalizeRecord } from '../_lib.js';
 
-function normalizeRecord(record) {
-  if (!record) return record;
-  const out = {};
-  for (const [k, v] of Object.entries(record)) {
-    out[k] = v === null || v === undefined ? '' : String(v);
-  }
-  return out;
-}
+// Prefix values that start with =,+,-,@ with a leading apostrophe so
+// spreadsheet apps (Excel/Sheets) treat them as literal text instead of
+// executing them as a formula (CSV/"formula injection" hardening).
+const csvEscape = v => {
+  let s = String(v || '');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return `"${s.replace(/"/g, '""')}"`;
+};
 
 export default async function handler(req, res) {
   cors(res);
@@ -19,13 +21,22 @@ export default async function handler(req, res) {
   try { verifyJWT(req); } catch { return err(res, 'Unauthorized', 401); }
 
   const emails = await kv.smembers('subscribers');
-  if (!emails || emails.length === 0) return ok(res, { subscribers: [] });
+  const records = emails?.length
+    ? (await Promise.all(emails.map(e => kv.hgetall(`subscriber:${e}`)))).filter(Boolean).map(r => normalizeRecord(r))
+    : [];
 
-  const subscribers = (await Promise.all(
-    emails.map(e => kv.hgetall(`subscriber:${e}`))
-  )).filter(Boolean).map(normalizeRecord);
+  if (req.query?.format === 'csv') {
+    records.sort((a, b) => (a.subscribedAt || '').localeCompare(b.subscribedAt || ''));
+    const lines = ['email,name,subscribedAt'];
+    for (const r of records) {
+      lines.push([csvEscape(r.email), csvEscape(r.name), csvEscape(r.subscribedAt)].join(','));
+    }
+    const filename = `subscribers_${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send('\uFEFF' + lines.join('\n')); // BOM for Excel UTF-8
+  }
 
-  subscribers.sort((a, b) => (b.subscribedAt || '').localeCompare(a.subscribedAt || '')); // newest first
-
-  return ok(res, { subscribers });
+  records.sort((a, b) => (b.subscribedAt || '').localeCompare(a.subscribedAt || '')); // newest first
+  return ok(res, { subscribers: records });
 }

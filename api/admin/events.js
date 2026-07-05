@@ -1,34 +1,10 @@
 // api/admin/events.js
 import { kv } from '../_kv.js';
-import { cors, verifyJWT, ok, err } from '../_lib.js';
+import { cors, verifyJWT, ok, err, normalizeRecord, safeParseJsonArray } from '../_lib.js';
 import { randomUUID } from 'crypto';
 
-// Normalize hash fields — Upstash auto-deserializes JSON-like values.
-// speakers is stored as JSON array string; if Upstash returns it as an object, re-stringify.
-function normalizeRecord(record) {
-  if (!record) return record;
-  const out = {};
-  for (const [k, v] of Object.entries(record)) {
-    if (k === 'speakers') {
-      if (Array.isArray(v) || (typeof v === 'object' && v !== null)) {
-        out[k] = JSON.stringify(v);
-      } else {
-        out[k] = v === null || v === undefined ? '[]' : String(v);
-      }
-    } else {
-      out[k] = v === null || v === undefined ? '' : String(v);
-    }
-  }
-  return out;
-}
-
-function parseSpeakers(event) {
-  const v = event?.speakers;
-  if (!v) return [];
-  if (Array.isArray(v)) return v;
-  if (typeof v === 'object') return Object.values(v);
-  try { return JSON.parse(v); } catch { return []; }
-}
+// Kept in sync with api/events.js — both files normalize the same hash shape.
+const EVENT_JSON_FIELDS = ['speakers', 'tagThemes'];
 
 export default async function handler(req, res) {
   cors(res);
@@ -39,7 +15,8 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const ids = await kv.smembers('events');
     if (!ids || ids.length === 0) return ok(res, { events: [] });
-    const events = (await Promise.all(ids.map(id => kv.hgetall(`event:${id}`)))).filter(Boolean).map(normalizeRecord);
+    const events = (await Promise.all(ids.map(id => kv.hgetall(`event:${id}`))))
+      .filter(Boolean).map(r => normalizeRecord(r, EVENT_JSON_FIELDS));
     events.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     return ok(res, { events });
   }
