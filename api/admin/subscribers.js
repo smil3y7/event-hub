@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   if (caller.role !== 'admin' && caller.role !== 'master') return err(res, 'Forbidden', 403);
 
   if (req.method === 'POST' && req.query?.action === 'send-invite') {
-    const { eventId } = req.body || {};
+    const { eventId, dryRun } = req.body || {};
     if (!eventId) return err(res, 'Missing eventId');
 
     const ev = await kv.hgetall(`event:${eventId}`);
@@ -49,6 +49,14 @@ export default async function handler(req, res) {
         <p style="line-height:1.6">${(ev.description || '').substring(0, 600)}</p>
         <p><a href="${eventUrl}" style="color:#7c6dfa">Več informacij in prijava →</a></p>
       </div>`;
+
+    // Dry run assembles the exact same subject/html/recipient list as a real
+    // send, just without ever calling sendEmail() — lets the whole pipeline
+    // (event lookup, HTML generation, subscriber count) be verified with no
+    // email provider configured at all.
+    if (dryRun) {
+      return ok(res, { preview: true, subject, html, recipientCount: emails.length });
+    }
 
     const chunks = [];
     for (let i = 0; i < emails.length; i += EMAIL_CHUNK_SIZE) chunks.push(emails.slice(i, i + EMAIL_CHUNK_SIZE));

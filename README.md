@@ -225,6 +225,19 @@ Celovit pregled kode je odkril in odpravil naslednje:
 - `sendEmail(to, subject, html)` v `_lib.js` — izolirana funkcija za Resend; če `RESEND_API_KEY`/`RESEND_FROM_EMAIL` nista nastavljena v Vercel env spremenljivkah, vrne jasno sporočilo namesto skrivnostne napake. Zamenjava ponudnika kadarkoli v prihodnje = sprememba te ene funkcije.
 - Gumb "📧 Pošlji vabilo" pri vsakem dogodku (samo admin/master) pošlje e-mail vsem naročnikom (BCC, v paketih po `EMAIL_CHUNK_SIZE = 45` naslovov na klic).
 
+### Dopolnitev 6 — testiranje pošiljanja brez API ključa + UX popravki
+
+**Predogled vabila brez API ključa:** gumb "👁 Predogled" pri vsakem dogodku sestavi popolnoma enak predmet/HTML kot pravo pošiljanje (isti event lookup, ista predloga), le da nikoli ne pokliče Resenda — v modalu (iframe) pokaže točno, kako bi e-pošta izgledala, in koliko naročnikov bi jo prejelo. Deluje brez kakršnegakoli API ključa.
+
+**Popravljeni bugi:**
+- Vnosna polja za dodajanje novih oznak (tipi/teme) in iskalno polje nad seznamom dogodkov niso bila zavita v `.field` razred, zato so padla nazaj na privzet svetel videz brskalnika namesto temne teme. CSS pravilo razširjeno na vsa polja znotraj `main.content`, ne le tista v `.field` — ista napaka se ne more več ponoviti pri prihodnjih dodatkih.
+- `#login-screen` je bil edini glavni zaslon v adminu brez privzetega `display:none` (za razliko od `#app` in `#change-pw-screen`) — zato je ob vsakem svežem nalaganju `admin.html` (npr. ob vrnitvi z ločene strani dnevnika) za trenutek bliskal prijavni obrazec, preden je preverjanje žetona sploh steklo. Dodano nevtralno "Nalagam..." stanje, prikazano dokler preverjanje ni zaključeno.
+- Povezava do dnevnika dejanj je uporabljala `target="_blank"`, zato se je pri vsakem odpiranju ustvaril nov zavihek (kopičenje zavihkov pri ponovnih obiskih). Odstranjeno — zdaj se odpre v istem zavihku.
+
+**UX izboljšave**:
+- Vsi `confirm()` pozivi brskalnika (brisanje dogodka/člana/uporabnika/oznake, pošiljanje vabila) zamenjani z lastnim modalom (`showConfirmModal()`), skladnim z videzom strani.
+- Dashboard: namesto predogleda dnevnika dejanj zdaj prikazuje "Zadnji dodani dogodki" (zadnji 3, klik odpre urejanje), z diskretno (manj vpadljivo) povezavo na poln dnevnik dejanj spodaj namesto prejšnjega izpostavljenega seznama.
+
 ### Dopolnitev 4 — N+1 poizvedbe in CSS podvajanje
 
 **N+1 poizvedbe odpravljene:** dodan `pipelineHgetall()` v `_lib.js`, ki namesto N posamičnih HTTP klicev proti Upstashu (`Promise.all(ids.map(id => kv.hgetall(...)))`) uporabi en sam pipeline klic. Uporabljeno na vseh 4 mestih, kjer se je pojavljalo: `api/events.js`, `api/admin/events.js`, `api/admin/subscribers.js`, `api/auth.js` (seznam uporabnikov).

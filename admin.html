@@ -36,6 +36,20 @@ html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
 .field textarea { resize: vertical; min-height: 80px; }
+
+/* Same dark styling for any input/select/textarea NOT wrapped in .field
+   (e.g. the events search bar, tag "add new" inputs) — a couple of these
+   were accidentally left with the browser's default white background
+   because they lived outside .field. This general rule means that class of
+   bug can't quietly reappear next time a new field is added outside .field. */
+main.content input[type="text"], main.content input[type="url"], main.content input[type="email"],
+main.content input[type="date"], main.content input[type="time"], main.content input[type="password"],
+main.content select, main.content textarea {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.55rem 0.8rem; color: var(--text); font-family: var(--sans); font-size: 0.88rem; outline: none;
+  transition: border-color 0.2s;
+}
+main.content input:focus, main.content select:focus, main.content textarea:focus { border-color: var(--accent); }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
   background: var(--accent); color: #fff; border: none; border-radius: 8px;
@@ -106,6 +120,20 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 }
 .tag-manage-row .tag-id { color: var(--text3); font-size: 0.76rem; }
 
+.confirm-modal-overlay {
+  position: fixed; inset: 0; background: rgba(5,5,10,0.65); z-index: 300;
+  display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+.confirm-modal-overlay.open { opacity: 1; pointer-events: auto; }
+.confirm-modal {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.5rem; max-width: 420px; width: 100%;
+}
+.confirm-modal p { font-size: 0.92rem; line-height: 1.65; color: var(--text); margin-bottom: 1.3rem; white-space: pre-line; }
+.confirm-modal-actions { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.confirm-modal-actions .btn { width: auto; }
+
 .events-list-controls { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .events-list-controls input[type="text"] { flex: 1; min-width: 200px; }
 .events-list-controls select { width: auto; }
@@ -120,6 +148,20 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 .audit-entry:last-child { border-bottom: none; }
 .audit-entry .audit-who { color: var(--accent2); }
 .audit-entry .audit-when { color: var(--text3); float: right; }
+
+.discreet-link {
+  display: inline-block; margin-top: 0.9rem; font-size: 0.78rem;
+  color: var(--text3); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s;
+}
+.discreet-link:hover { color: var(--text2); border-color: var(--text3); }
+
+.recent-event-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+  padding: 0.6rem 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: opacity 0.15s;
+}
+.recent-event-row:last-child { border-bottom: none; }
+.recent-event-row:hover { opacity: 0.8; }
+.recent-event-title { font-size: 0.88rem; color: var(--text); }
 
 .row { display: flex; gap: 1rem; flex-wrap: wrap; }
 .row .field { flex: 1; min-width: 200px; }
@@ -238,8 +280,35 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 </head>
 <body>
 
+<!-- Confirm modal — replaces browser confirm() everywhere in this file -->
+<div class="confirm-modal-overlay" id="confirm-modal-overlay">
+  <div class="confirm-modal">
+    <p id="confirm-modal-message"></p>
+    <div class="confirm-modal-actions">
+      <button class="btn secondary" onclick="resolveConfirmModal(false)">Prekliči</button>
+      <button class="btn" id="confirm-modal-ok" onclick="resolveConfirmModal(true)">Potrdi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Invite preview modal — shows the exact subject/HTML that would be sent, without ever calling the email provider -->
+<div class="confirm-modal-overlay" id="preview-modal-overlay">
+  <div class="confirm-modal" style="max-width:640px">
+    <h2 style="font-size:1rem; font-weight:500; margin-bottom:0.8rem">Predogled vabila</h2>
+    <p id="preview-modal-meta" style="margin-bottom:0.8rem; color:var(--text2); font-size:0.85rem; white-space:normal"></p>
+    <iframe id="preview-modal-frame" title="Predogled e-pošte" style="width:100%; height:360px; border:1px solid var(--border); border-radius:8px; background:#fff"></iframe>
+    <div class="confirm-modal-actions" style="margin-top:1rem">
+      <button class="btn secondary" onclick="closePreviewModal()">Zapri</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ AUTH LOADING (shown only during the initial token check, so neither the login form nor the app flashes before we know which one to show) ═══════════ -->
+<div id="auth-loading" style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--text3); font-family:var(--sans); font-size:0.9rem">Nalagam...</div>
+
 <!-- ═══════════ LOGIN SCREEN ═══════════ -->
-<div class="login-wrap" id="login-screen">
+<div class="login-wrap" id="login-screen" style="display:none">
   <div class="login-box">
     <h1>✦ Admin</h1>
     <p class="sub">Prijava v nadzorno ploščo</p>
@@ -324,10 +393,10 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
         <h2>Naslednji dogodek</h2>
         <div id="dashboard-next-event"><p class="empty-hint">Nalaganje...</p></div>
       </div>
-      <div class="card" id="dashboard-audit-card" style="display:none">
-        <h2>Nedavna dejanja</h2>
-        <div id="dashboard-audit-preview"><p class="empty-hint">Nalaganje...</p></div>
-        <a href="/admin/audit.html" target="_blank" style="display:inline-block; margin-top:0.8rem; font-size:0.82rem; color:var(--accent)">Celoten dnevnik →</a>
+      <div class="card">
+        <h2>Zadnji dodani dogodki</h2>
+        <div id="dashboard-recent-events"><p class="empty-hint">Nalaganje...</p></div>
+        <a href="/admin/audit.html" class="discreet-link" id="audit-link">Dnevnik dejanj →</a>
       </div>
     </div>
 
@@ -673,6 +742,39 @@ function showToast(msg, isError = false) {
   setTimeout(() => t.className = 'toast', 2500);
 }
 
+// ── CONFIRM MODAL ── replaces browser confirm() everywhere in this file.
+// Usage: if (!(await showConfirmModal('Izbrišem X?'))) return;
+let _confirmResolve = null;
+function showConfirmModal(message, { danger = true } = {}) {
+  return new Promise(resolve => {
+    document.getElementById('confirm-modal-message').textContent = message;
+    document.getElementById('confirm-modal-ok').className = 'btn' + (danger ? ' danger' : '');
+    document.getElementById('confirm-modal-overlay').classList.add('open');
+    _confirmResolve = resolve;
+  });
+}
+function resolveConfirmModal(result) {
+  document.getElementById('confirm-modal-overlay').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+document.getElementById('confirm-modal-overlay').addEventListener('click', e => {
+  if (e.target.id === 'confirm-modal-overlay') resolveConfirmModal(false);
+});
+
+// ── INVITE PREVIEW MODAL ──
+function showPreviewModal(subject, html, recipientCount) {
+  document.getElementById('preview-modal-meta').innerHTML =
+    `<strong>Zadeva:</strong> ${escapeHtml(subject)}<br><strong>Prejemniki:</strong> ${recipientCount} naročnik${recipientCount === 1 ? '' : recipientCount < 5 ? 'i' : 'ov'} (BCC)`;
+  document.getElementById('preview-modal-frame').srcdoc = html;
+  document.getElementById('preview-modal-overlay').classList.add('open');
+}
+function closePreviewModal() {
+  document.getElementById('preview-modal-overlay').classList.remove('open');
+}
+document.getElementById('preview-modal-overlay').addEventListener('click', e => {
+  if (e.target.id === 'preview-modal-overlay') closePreviewModal();
+});
+
 function authHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 }
@@ -784,6 +886,7 @@ function enterApp(meData) {
     document.getElementById('settings-card-content').style.display = 'none';
     document.getElementById('settings-card-tags').style.display = 'none';
     document.getElementById('stat-subscribers-card').style.display = 'none';
+    document.getElementById('audit-link').style.display = 'none';
   }
   if (meData?.displayName) {
     document.getElementById('who-label').textContent = `${meData.displayName} (${userRole})`;
@@ -793,7 +896,6 @@ function enterApp(meData) {
   loadSettings();
   if (userRole !== 'editor') loadSubscribers();
   if (userRole === 'master') loadUsers();
-  if (userRole !== 'editor') loadAuditPreview();
 }
 
 /* ── TABS ── */
@@ -822,6 +924,7 @@ function renderDashboard() {
   const drafts = currentEventsList.filter(e => e.published !== 'true');
   document.getElementById('stat-published').textContent = published.length;
   document.getElementById('stat-drafts').textContent = drafts.length;
+  renderRecentEvents();
 
   const upcoming = published.filter(e => isUpcoming(e.date)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const next = upcoming[0];
@@ -855,36 +958,37 @@ function formatCountdown(dateStr, timeStr) {
   return `čez ${days} dni`;
 }
 
-const AUDIT_ACTION_LABELS = {
-  'event.create': 'je ustvaril/a dogodek',
-  'event.update': 'je posodobil/a dogodek',
-  'event.delete': 'je izbrisal/a dogodek',
-  'settings.update': 'je spremenil/a nastavitve',
-  'tag.add': 'je dodal/a oznako',
-  'tag.delete': 'je izbrisal/a oznako',
-  'member.add': 'je dodal/a člana ekipe',
-  'member.update': 'je posodobil/a člana ekipe',
-  'member.delete': 'je izbrisal/a člana ekipe',
-  'user.add': 'je dodal/a uporabnika',
-  'user.delete': 'je izbrisal/a uporabnika'
-};
+function renderRecentEvents() {
+  const el = document.getElementById('dashboard-recent-events');
+  const recent = [...currentEventsList]
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+    .slice(0, 3);
+  if (!recent.length) { el.innerHTML = '<p class="empty-hint">Še ni dogodkov.</p>'; return; }
+  el.innerHTML = recent.map(ev => `
+    <div class="recent-event-row" onclick="editEventById('${ev.id}'); switchTab('events')">
+      <span class="recent-event-title">${escapeHtml(ev.title)}</span>
+      <span class="status ${ev.published === 'true' ? 'pub' : 'draft'}">${ev.published === 'true' ? 'Objavljeno' : 'Osnutek'}</span>
+    </div>
+  `).join('');
+}
 
-async function loadAuditPreview() {
+// Preview mode: asks the backend to assemble the exact same subject/HTML it
+// would send, but never calls the email provider — works with zero
+// configuration, useful for checking everything looks right before ever
+// setting up RESEND_API_KEY.
+async function previewInviteForEvent(id, btn) {
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = '…';
   try {
-    const data = await apiCall('/admin/audit?limit=5');
-    const card = document.getElementById('dashboard-audit-card');
-    const el = document.getElementById('dashboard-audit-preview');
-    card.style.display = '';
-    if (!data.entries?.length) { el.innerHTML = '<p class="empty-hint">Še ni zabeleženih dejanj.</p>'; return; }
-    el.innerHTML = data.entries.map(e => `
-      <div class="audit-entry">
-        <span class="audit-when">${new Date(e.at).toLocaleDateString('sl-SI', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-        <span class="audit-who">${escapeHtml(e.who || '')}</span> ${escapeHtml(AUDIT_ACTION_LABELS[e.action] || e.action)} ${escapeHtml(e.target || '')}
-      </div>
-    `).join('');
-  } catch {
-    // Non-critical — the dashboard still works fine without this preview
-    // (e.g. if the caller's role can't see it, apiCall's 403 lands here silently).
+    const data = await apiCall('/admin/subscribers?action=send-invite', {
+      method: 'POST',
+      body: JSON.stringify({ eventId: id, dryRun: true })
+    });
+    showPreviewModal(data.subject, data.html, data.recipientCount);
+  } catch (e) {
+    showToast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = original;
   }
 }
 
@@ -895,7 +999,7 @@ async function loadAuditPreview() {
 async function sendInviteForEvent(id, btn) {
   const ev = currentEventsList.find(e => e.id === id);
   if (!ev) return;
-  if (!confirm(`Pošljem vabilo za "${ev.title}" vsem naročnikom na e-novice?`)) return;
+  if (!(await showConfirmModal(`Pošljem vabilo za "${ev.title}" vsem naročnikom na e-novice?`, { danger: false }))) return;
   const original = btn.textContent;
   btn.disabled = true; btn.textContent = '…';
   try {
@@ -952,7 +1056,9 @@ function renderEventsList(events) {
       <div class="row-actions">
         <button class="icon-btn" title="Uredi" onclick="editEventById('${ev.id}')">✎</button>
         <button class="icon-btn" title="Podvoji" onclick="duplicateEventById('${ev.id}')">⧉</button>
-        ${userRole !== 'editor' ? `<button class="icon-btn" title="Pošlji vabilo naročnikom" onclick="sendInviteForEvent('${ev.id}', this)">📧</button>` : ''}
+        ${userRole !== 'editor' ? `
+          <button class="icon-btn" title="Predogled vabila" onclick="previewInviteForEvent('${ev.id}', this)">👁</button>
+          <button class="icon-btn" title="Pošlji vabilo naročnikom" onclick="sendInviteForEvent('${ev.id}', this)">📧</button>` : ''}
         <button class="icon-btn del" title="Izbriši" onclick="deleteEvent('${ev.id}')">✕</button>
       </div>
     </div>
@@ -1368,7 +1474,7 @@ async function handleSaveEvent(e) {
 }
 
 async function deleteEvent(id) {
-  if (!confirm('Izbrišem ta dogodek?')) return;
+  if (!(await showConfirmModal('Izbrišem ta dogodek?'))) return;
   try {
     await apiCall(`/admin/events?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     showToast('Dogodek izbrisan.');
@@ -1498,7 +1604,7 @@ async function deleteTag(scope, id) {
   const warning = count > 0
     ? `Ta oznaka je uporabljena pri ${count} ${count === 1 ? 'dogodku' : 'dogodkih'}. Če jo izbrišeš, bodo ti dogodki namesto lepega imena prikazovali surov ID ("${id}"). Res želiš izbrisati oznako?`
     : 'Izbrišem to oznako?';
-  if (!confirm(warning)) return;
+  if (!(await showConfirmModal(warning))) return;
   try {
     const data = await apiCall(`/admin/settings?action=delete-tag&scope=${scope}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     currentEventTypes = data.eventTypes || currentEventTypes;
@@ -1585,7 +1691,7 @@ async function handleSaveTeamMember(e) {
 }
 
 async function deleteTeamMember(id) {
-  if (!confirm('Izbrišem tega člana?')) return;
+  if (!(await showConfirmModal('Izbrišem tega člana?'))) return;
   try {
     const data = await apiCall(`/admin/settings?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     showToast('Član izbrisan.');
@@ -1668,7 +1774,7 @@ async function handleAddUser(e) {
 }
 
 async function deleteUser(u) {
-  if (!confirm(`Izbrišem uporabnika "${u}"?`)) return;
+  if (!(await showConfirmModal(`Izbrišem uporabnika "${u}"?`))) return;
   try {
     await apiCall(`/auth?action=delete-user&username=${encodeURIComponent(u)}`, { method: 'DELETE' });
     showToast('Uporabnik izbrisan.');
@@ -1729,11 +1835,17 @@ function exportCsv() {
 // or tampered token would flash the whole admin UI before the first API
 // call bounced it back to the login screen a moment later.
 async function initAuth() {
-  if (!token) { document.getElementById('login-screen').style.display = 'flex'; return; }
+  if (!token) {
+    document.getElementById('auth-loading').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    return;
+  }
   try {
     const data = await apiCall('/auth?action=me'); // throws + calls logout() internally on 401
+    document.getElementById('auth-loading').style.display = 'none';
     enterApp(data);
   } catch {
+    document.getElementById('auth-loading').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
   }
 }
