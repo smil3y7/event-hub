@@ -4,15 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin</title>
+<link rel="stylesheet" href="/_theme.css">
 <script defer src="/_vercel/insights/script.js"></script>
 <style>
 :root {
-  --bg: #0a0a12; --bg2: #10101e; --bg3: #16162a;
-  --card: #1a1a2e; --border: rgba(120,100,255,0.18);
-  --accent: #7c6dfa; --accent2: #c4a44a;
-  --text: #e8e4ff; --text2: #9d97c8; --text3: #5e5a8a;
   --danger: #e06060; --radius: 12px;
-  --sans: system-ui, -apple-system, sans-serif;
 }
 * , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); }
@@ -88,6 +84,43 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
   padding: 1.5rem; margin-bottom: 1.2rem;
 }
 .card h2 { font-size: 1rem; font-weight: 500; margin-bottom: 1.2rem; color: var(--text); }
+
+/* Collapsible cards (used in Nastavitve) — header always visible, body
+   toggles open/closed. Default open/closed state is set via the initial
+   "open" class on .card in the HTML. */
+.card.collapsible { padding: 0; }
+.card.collapsible .card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; padding: 1.5rem; user-select: none;
+}
+.card.collapsible .card-header h2 { margin-bottom: 0; }
+.card.collapsible .card-header .chevron { color: var(--text3); transition: transform 0.2s; font-size: 0.85rem; }
+.card.collapsible.open .card-header .chevron { transform: rotate(180deg); }
+.card.collapsible .card-body { display: none; padding: 0 1.5rem 1.5rem; }
+.card.collapsible.open .card-body { display: block; }
+
+.tag-manage-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.tag-manage-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 0.5rem 0.8rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg3);
+}
+.tag-manage-row .tag-id { color: var(--text3); font-size: 0.76rem; }
+
+.events-list-controls { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.events-list-controls input[type="text"] { flex: 1; min-width: 200px; }
+.events-list-controls select { width: auto; }
+
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.2rem; }
+.stat-card { text-align: center; padding: 1.4rem 1rem; }
+.stat-value { font-size: 2.2rem; font-weight: 500; color: var(--accent2); line-height: 1; margin-bottom: 0.4rem; }
+.stat-label { font-size: 0.8rem; color: var(--text3); }
+.next-event-row { display: flex; align-items: center; gap: 1rem; }
+.next-event-countdown { font-size: 1.4rem; color: var(--accent2); font-weight: 500; white-space: nowrap; }
+.audit-entry { padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; color: var(--text2); }
+.audit-entry:last-child { border-bottom: none; }
+.audit-entry .audit-who { color: var(--accent2); }
+.audit-entry .audit-when { color: var(--text3); float: right; }
+
 .row { display: flex; gap: 1rem; flex-wrap: wrap; }
 .row .field { flex: 1; min-width: 200px; }
 .checkbox-field { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
@@ -261,8 +294,9 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
   </header>
 
   <nav class="tabs">
-    <button class="active" data-tab="events" onclick="switchTab('events')">Dogodki</button>
-    <button data-tab="subscribers" onclick="switchTab('subscribers')">Naročniki</button>
+    <button class="active" data-tab="dashboard" onclick="switchTab('dashboard')">Pregled</button>
+    <button data-tab="events" onclick="switchTab('events')">Dogodki</button>
+    <button id="subscribers-tab-btn" data-tab="subscribers" onclick="switchTab('subscribers')">Naročniki</button>
     <button data-tab="settings" onclick="switchTab('settings')">Nastavitve</button>
     <button data-tab="account" onclick="switchTab('account')">Račun</button>
     <button id="users-tab-btn" data-tab="users" onclick="switchTab('users')" style="display:none">Uporabniki</button>
@@ -270,8 +304,35 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 
   <main class="content">
 
+    <!-- DASHBOARD PANEL -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="dashboard-grid">
+        <div class="card stat-card">
+          <div class="stat-value" id="stat-published">–</div>
+          <div class="stat-label">Objavljenih dogodkov</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-value" id="stat-drafts">–</div>
+          <div class="stat-label">Osnutkov</div>
+        </div>
+        <div class="card stat-card" id="stat-subscribers-card">
+          <div class="stat-value" id="stat-subscribers">–</div>
+          <div class="stat-label">Naročnikov na e-novice</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Naslednji dogodek</h2>
+        <div id="dashboard-next-event"><p class="empty-hint">Nalaganje...</p></div>
+      </div>
+      <div class="card" id="dashboard-audit-card" style="display:none">
+        <h2>Nedavna dejanja</h2>
+        <div id="dashboard-audit-preview"><p class="empty-hint">Nalaganje...</p></div>
+        <a href="/admin/audit.html" target="_blank" style="display:inline-block; margin-top:0.8rem; font-size:0.82rem; color:var(--accent)">Celoten dnevnik →</a>
+      </div>
+    </div>
+
     <!-- EVENTS PANEL -->
-    <div class="panel active" id="panel-events">
+    <div class="panel" id="panel-events">
       <div class="card">
         <h2 id="event-form-title">Nov dogodek</h2>
         <form id="event-form" onsubmit="handleSaveEvent(event)">
@@ -364,6 +425,7 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
               <button type="button" class="btn secondary small" onclick="addSpeakerRow()">+ Dodaj</button>
             </div>
             <div id="speakers-list"></div>
+            <datalist id="known-speakers-list"></datalist>
           </div>
 
           <div style="display:flex; gap:0.6rem">
@@ -375,6 +437,14 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
 
       <div class="card">
         <h2>Obstoječi dogodki</h2>
+        <div class="events-list-controls">
+          <input type="text" id="events-search" placeholder="Išči po naslovu ali lokaciji..." oninput="renderEventsList(currentEventsList)">
+          <select id="events-filter-status" onchange="renderEventsList(currentEventsList)">
+            <option value="">Vsi statusi</option>
+            <option value="published">Objavljeno</option>
+            <option value="draft">Osnutek</option>
+          </select>
+        </div>
         <div id="events-list"><p class="empty-hint">Nalaganje...</p></div>
       </div>
     </div>
@@ -383,100 +453,140 @@ main.content { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
     <div class="panel" id="panel-subscribers">
       <div class="card">
         <h2>Naročniki na e-novice</h2>
+        <div class="checkbox-field">
+          <input type="checkbox" id="set-collectname">
+          <label for="set-collectname">Zbiraj tudi ime (poleg e-maila) pri prijavi</label>
+        </div>
         <div style="display:flex; gap:0.6rem; margin-bottom:1.2rem; flex-wrap:wrap">
+          <button class="btn secondary" style="width:auto" onclick="saveSettings()">Shrani nastavitev</button>
           <button class="btn" style="width:auto" onclick="exportCsv()">⬇ Izvozi CSV</button>
           <button class="btn secondary" style="width:auto" onclick="copyEmails()">⧉ Kopiraj e-maile (za BCC)</button>
         </div>
+        <hr style="border:none; border-top:1px solid var(--border); margin:0.4rem 0 1.2rem">
         <div id="subscribers-list"><p class="empty-hint">Nalaganje...</p></div>
       </div>
     </div>
 
     <!-- SETTINGS PANEL -->
     <div class="panel" id="panel-settings">
-      <div class="card">
-        <h2>Način prikaza</h2>
-        <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1rem">Velja za celotno javno stran. Barvni ton se nastavlja posamično pri vsakem dogodku.</p>
-        <div class="mode-grid" id="mode-grid">
-          <div class="mode-opt" data-mode="single" onclick="selectMode('single')">
-            <div class="icon">▭</div><span>Single<br><small style="color:var(--text3)">en pod drugim</small></span>
+      <div class="card collapsible open" id="settings-card-mode">
+        <div class="card-header" onclick="toggleAdminCard(this)">
+          <h2>Način prikaza</h2><span class="chevron">▾</span>
+        </div>
+        <div class="card-body">
+          <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1rem">Velja za celotno javno stran. Barvni ton se nastavlja posamično pri vsakem dogodku.</p>
+          <div class="mode-grid" id="mode-grid">
+            <div class="mode-opt" data-mode="single" onclick="selectMode('single')">
+              <div class="icon">▭</div><span>Single<br><small style="color:var(--text3)">en pod drugim</small></span>
+            </div>
+            <div class="mode-opt" data-mode="catalog" onclick="selectMode('catalog')">
+              <div class="icon">▦</div><span>Catalog<br><small style="color:var(--text3)">mreža</small></span>
+            </div>
+            <div class="mode-opt" data-mode="series" onclick="selectMode('series')">
+              <div class="icon">⋮</div><span>Series<br><small style="color:var(--text3)">časovnica</small></span>
+            </div>
           </div>
-          <div class="mode-opt" data-mode="catalog" onclick="selectMode('catalog')">
-            <div class="icon">▦</div><span>Catalog<br><small style="color:var(--text3)">mreža</small></span>
-          </div>
-          <div class="mode-opt" data-mode="series" onclick="selectMode('series')">
-            <div class="icon">⋮</div><span>Series<br><small style="color:var(--text3)">časovnica</small></span>
-          </div>
+          <button class="btn" style="width:auto; margin-top:1rem" onclick="saveSettings()">Shrani nastavitve</button>
         </div>
-
-        <h2>Vsebina strani</h2>
-        <div class="field">
-          <label>Naslov strani</label>
-          <input type="text" id="set-title">
-        </div>
-        <div class="field">
-          <label>Podnaslov</label>
-          <input type="text" id="set-subtitle">
-        </div>
-        <div class="field">
-          <label>Hero besedilo (opis namena strani, prikazan pod headerjem)</label>
-          <textarea id="set-hero" style="min-height:90px" placeholder="Kratko opiši, čemu je stran namenjena, koga vabite, kaj ponujate..." oninput="updateHeroCounter(this)"></textarea>
-          <div class="char-counter" id="hero-counter">0 / 3000</div>
-        </div>
-        <div class="checkbox-field">
-          <input type="checkbox" id="set-collectname">
-          <label for="set-collectname">Zbiraj tudi ime (poleg e-maila)</label>
-        </div>
-        <div class="field">
-          <label>Besedilo v nogi strani</label>
-          <input type="text" id="set-footer" placeholder="npr. kontakt@primer.si · Instagram: @primer">
-        </div>
-        <button class="btn" style="width:auto" onclick="saveSettings()">Shrani nastavitve</button>
       </div>
 
-      <div class="card">
-        <h2>Ekipa</h2>
-        <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1.2rem">Člani, ki se prikažejo v hero sekciji javne strani.</p>
-        <form id="team-form" onsubmit="handleSaveTeamMember(event)">
-          <input type="hidden" id="tm-id">
-          <div class="row">
-            <div class="field">
-              <label>Ime *</label>
-              <input type="text" id="tm-name" required>
-            </div>
-            <div class="field">
-              <label>Vloga / naziv</label>
-              <input type="text" id="tm-role" placeholder="npr. Sanjski vodič">
-            </div>
+      <div class="card collapsible" id="settings-card-content">
+        <div class="card-header" onclick="toggleAdminCard(this)">
+          <h2>Vsebina strani</h2><span class="chevron">▾</span>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label>Naslov strani</label>
+            <input type="text" id="set-title">
           </div>
           <div class="field">
-            <label>Kratka predstavitev</label>
-            <textarea id="tm-bio" style="min-height:60px"></textarea>
+            <label>Podnaslov</label>
+            <input type="text" id="set-subtitle">
           </div>
           <div class="field">
-            <label>Slika člana</label>
-            <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.4rem">
-              <input type="file" id="tm-image-file" accept="image/jpeg,image/png,image/webp" style="flex:1; font-size:0.82rem" onchange="handleMemberImageUpload(event)">
-              <span id="tm-upload-status" class="sp-status"></span>
-            </div>
-            <input type="url" id="tm-image" placeholder="...ali prilepi URL slike">
-            <div id="tm-image-preview" style="margin-top:0.5rem"></div>
+            <label>Hero besedilo (opis namena strani, prikazan pod headerjem)</label>
+            <textarea id="set-hero" style="min-height:90px" placeholder="Kratko opiši, čemu je stran namenjena, koga vabite, kaj ponujate..." oninput="updateHeroCounter(this)"></textarea>
+            <div class="char-counter" id="hero-counter">0 / 3000</div>
           </div>
-          <div class="row">
+          <div class="field">
+            <label>Besedilo v nogi strani</label>
+            <input type="text" id="set-footer" placeholder="npr. kontakt@primer.si · Instagram: @primer">
+          </div>
+          <button class="btn" style="width:auto" onclick="saveSettings()">Shrani nastavitve</button>
+        </div>
+      </div>
+
+      <div class="card collapsible" id="settings-card-tags">
+        <div class="card-header" onclick="toggleAdminCard(this)">
+          <h2>Oznake dogodkov</h2><span class="chevron">▾</span>
+        </div>
+        <div class="card-body">
+          <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1.2rem">Uporabljene pri urejanju dogodka za označevanje tipa in teme. Ime lahko kadarkoli spremeniš brez težav (samo prikaz se spremeni) — če pa oznako izbrišeš, dogodki, ki jo (še) uporabljajo, izgubijo lepo prikazano ime.</p>
+
+          <h3 style="font-size:0.9rem; font-weight:500; margin-bottom:0.6rem; color:var(--text)">Tipi dogodkov</h3>
+          <div id="tag-types-list" class="tag-manage-list"><p class="empty-hint">Nalaganje...</p></div>
+          <div style="display:flex; gap:0.5rem; margin:0.8rem 0 1.8rem">
+            <input type="text" id="new-tag-type-input" placeholder="npr. Delavnica" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTag('type');}">
+            <button class="btn secondary" style="width:auto" onclick="addTag('type')">+ Dodaj</button>
+          </div>
+
+          <h3 style="font-size:0.9rem; font-weight:500; margin-bottom:0.6rem; color:var(--text)">Teme</h3>
+          <div id="tag-themes-list" class="tag-manage-list"><p class="empty-hint">Nalaganje...</p></div>
+          <div style="display:flex; gap:0.5rem; margin-top:0.8rem">
+            <input type="text" id="new-tag-theme-input" placeholder="npr. Izventelesne izkušnje" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTag('theme');}">
+            <button class="btn secondary" style="width:auto" onclick="addTag('theme')">+ Dodaj</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card collapsible">
+        <div class="card-header" onclick="toggleAdminCard(this)">
+          <h2>Ekipa</h2><span class="chevron">▾</span>
+        </div>
+        <div class="card-body">
+          <p style="color:var(--text2); font-size:0.85rem; margin-bottom:1.2rem">Člani, ki se prikažejo v hero sekciji javne strani.</p>
+          <form id="team-form" onsubmit="handleSaveTeamMember(event)">
+            <input type="hidden" id="tm-id">
+            <div class="row">
+              <div class="field">
+                <label>Ime *</label>
+                <input type="text" id="tm-name" required>
+              </div>
+              <div class="field">
+                <label>Vloga / naziv</label>
+                <input type="text" id="tm-role" placeholder="npr. Sanjski vodič">
+              </div>
+            </div>
             <div class="field">
-              <label>Spletna stran / link</label>
-              <input type="url" id="tm-link" placeholder="https://...">
+              <label>Kratka predstavitev</label>
+              <textarea id="tm-bio" style="min-height:60px"></textarea>
             </div>
             <div class="field">
-              <label>Kontakt (e-mail ali telefon)</label>
-              <input type="text" id="tm-contact" placeholder="npr. jana@primer.si">
+              <label>Slika člana</label>
+              <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.4rem">
+                <input type="file" id="tm-image-file" accept="image/jpeg,image/png,image/webp" style="flex:1; font-size:0.82rem" onchange="handleMemberImageUpload(event)">
+                <span id="tm-upload-status" class="sp-status"></span>
+              </div>
+              <input type="url" id="tm-image" placeholder="...ali prilepi URL slike">
+              <div id="tm-image-preview" style="margin-top:0.5rem"></div>
             </div>
-          </div>
-          <div style="display:flex; gap:0.6rem">
-            <button class="btn" type="submit" id="tm-save-btn" style="width:auto">Dodaj člana</button>
-            <button class="btn secondary" type="button" id="tm-cancel-btn" onclick="resetTeamForm()" style="display:none; width:auto">Prekliči</button>
-          </div>
-        </form>
-        <div id="team-list" style="margin-top:1.2rem"><p class="empty-hint">Nalaganje...</p></div>
+            <div class="row">
+              <div class="field">
+                <label>Spletna stran / link</label>
+                <input type="url" id="tm-link" placeholder="https://...">
+              </div>
+              <div class="field">
+                <label>Kontakt (e-mail ali telefon)</label>
+                <input type="text" id="tm-contact" placeholder="npr. jana@primer.si">
+              </div>
+            </div>
+            <div style="display:flex; gap:0.6rem">
+              <button class="btn" type="submit" id="tm-save-btn" style="width:auto">Dodaj člana</button>
+              <button class="btn secondary" type="button" id="tm-cancel-btn" onclick="resetTeamForm()" style="display:none; width:auto">Prekliči</button>
+            </div>
+          </form>
+          <div id="team-list" style="margin-top:1.2rem"><p class="empty-hint">Nalaganje...</p></div>
+        </div>
       </div>
     </div>
 
@@ -664,14 +774,26 @@ function enterApp(meData) {
   document.getElementById('app').classList.add('active');
   document.getElementById('who-label').textContent = `${username} (${userRole})`;
   if (userRole === 'master') document.getElementById('users-tab-btn').style.display = '';
+  if (userRole === 'editor') {
+    // Editor ureja vsebino (dogodki, ekipa) znotraj že postavljenih okvirjev —
+    // nastavitve strani, oznake in seznam naročnikov (osebni podatki) so
+    // rezervirani za admin/master. Prava zaščita je na backendu (403), to je
+    // le UI-jasnost, da editor sploh ne vidi kontrol, ki jih ne sme uporabljati.
+    document.getElementById('subscribers-tab-btn').style.display = 'none';
+    document.getElementById('settings-card-mode').style.display = 'none';
+    document.getElementById('settings-card-content').style.display = 'none';
+    document.getElementById('settings-card-tags').style.display = 'none';
+    document.getElementById('stat-subscribers-card').style.display = 'none';
+  }
   if (meData?.displayName) {
     document.getElementById('who-label').textContent = `${meData.displayName} (${userRole})`;
     document.getElementById('name-input').value = meData.displayName;
   }
   loadEvents();
   loadSettings();
-  loadSubscribers();
+  if (userRole !== 'editor') loadSubscribers();
   if (userRole === 'master') loadUsers();
+  if (userRole !== 'editor') loadAuditPreview();
 }
 
 /* ── TABS ── */
@@ -689,7 +811,104 @@ async function loadEvents() {
     const data = await apiCall('/admin/events');
     currentEventsList = data.events || [];
     renderEventsList(currentEventsList);
+    renderSpeakerDatalist();
+    renderDashboard();
   } catch (e) { showToast(e.message, true); }
+}
+
+// ── DASHBOARD ── (Pregled tab)
+function renderDashboard() {
+  const published = currentEventsList.filter(e => e.published === 'true');
+  const drafts = currentEventsList.filter(e => e.published !== 'true');
+  document.getElementById('stat-published').textContent = published.length;
+  document.getElementById('stat-drafts').textContent = drafts.length;
+
+  const upcoming = published.filter(e => isUpcoming(e.date)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const next = upcoming[0];
+  const el = document.getElementById('dashboard-next-event');
+  if (!next) {
+    el.innerHTML = '<p class="empty-hint">Ni prihajajočih objavljenih dogodkov.</p>';
+  } else {
+    el.innerHTML = `
+      <div class="next-event-row">
+        <div style="flex:1">
+          <h3 style="font-weight:500">${escapeHtml(next.title)}</h3>
+          <div style="color:var(--text3); font-size:0.85rem; margin-top:0.3rem">${escapeHtml(next.date || '')}${next.time ? ' · ' + escapeHtml(next.time) : ''}${next.location ? ' · ' + escapeHtml(next.location) : ''}</div>
+        </div>
+        <div class="next-event-countdown">${formatCountdown(next.date, next.time)}</div>
+      </div>`;
+  }
+}
+
+function formatCountdown(dateStr, timeStr) {
+  if (!dateStr) return '';
+  const target = new Date(`${dateStr}T${timeStr || '00:00'}:00`);
+  if (isNaN(target.getTime())) return '';
+  const now = new Date();
+  // Compare calendar dates (not raw ms/24h), so "tomorrow at 9am" reads as
+  // "jutri" even when it's currently less than 24 hours away this afternoon.
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const days = Math.round((startOfTarget - startOfToday) / (1000 * 60 * 60 * 24));
+  if (days <= 0) return 'danes';
+  if (days === 1) return 'jutri';
+  return `čez ${days} dni`;
+}
+
+const AUDIT_ACTION_LABELS = {
+  'event.create': 'je ustvaril/a dogodek',
+  'event.update': 'je posodobil/a dogodek',
+  'event.delete': 'je izbrisal/a dogodek',
+  'settings.update': 'je spremenil/a nastavitve',
+  'tag.add': 'je dodal/a oznako',
+  'tag.delete': 'je izbrisal/a oznako',
+  'member.add': 'je dodal/a člana ekipe',
+  'member.update': 'je posodobil/a člana ekipe',
+  'member.delete': 'je izbrisal/a člana ekipe',
+  'user.add': 'je dodal/a uporabnika',
+  'user.delete': 'je izbrisal/a uporabnika'
+};
+
+async function loadAuditPreview() {
+  try {
+    const data = await apiCall('/admin/audit?limit=5');
+    const card = document.getElementById('dashboard-audit-card');
+    const el = document.getElementById('dashboard-audit-preview');
+    card.style.display = '';
+    if (!data.entries?.length) { el.innerHTML = '<p class="empty-hint">Še ni zabeleženih dejanj.</p>'; return; }
+    el.innerHTML = data.entries.map(e => `
+      <div class="audit-entry">
+        <span class="audit-when">${new Date(e.at).toLocaleDateString('sl-SI', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+        <span class="audit-who">${escapeHtml(e.who || '')}</span> ${escapeHtml(AUDIT_ACTION_LABELS[e.action] || e.action)} ${escapeHtml(e.target || '')}
+      </div>
+    `).join('');
+  } catch {
+    // Non-critical — the dashboard still works fine without this preview
+    // (e.g. if the caller's role can't see it, apiCall's 403 lands here silently).
+  }
+}
+
+// Sends the invite via the configured email provider (see RESEND_API_KEY /
+// RESEND_FROM_EMAIL in Vercel env vars). Until those are set, the backend
+// returns a clear "not configured" message — this button works today, it
+// just can't do anything until you set up an email provider account.
+async function sendInviteForEvent(id, btn) {
+  const ev = currentEventsList.find(e => e.id === id);
+  if (!ev) return;
+  if (!confirm(`Pošljem vabilo za "${ev.title}" vsem naročnikom na e-novice?`)) return;
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const data = await apiCall('/admin/subscribers?action=send-invite', {
+      method: 'POST',
+      body: JSON.stringify({ eventId: id })
+    });
+    showToast(`Vabilo poslano ${data.sent} naročnikom.`);
+  } catch (e) {
+    showToast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = original;
+  }
 }
 
 function editEventById(id) {
@@ -708,7 +927,20 @@ function renderEventsList(events) {
   const el = document.getElementById('events-list');
   if (!events.length) { el.innerHTML = '<p class="empty-hint">Še ni dogodkov. Dodaj prvega zgoraj.</p>'; return; }
   events.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  el.innerHTML = events.map(ev => `
+
+  const searchEl = document.getElementById('events-search');
+  const statusEl = document.getElementById('events-filter-status');
+  const q = (searchEl?.value || '').trim().toLowerCase();
+  const statusFilter = statusEl?.value || '';
+
+  let filtered = events;
+  if (q) filtered = filtered.filter(ev => (ev.title || '').toLowerCase().includes(q) || (ev.location || '').toLowerCase().includes(q));
+  if (statusFilter === 'published') filtered = filtered.filter(ev => ev.published === 'true');
+  if (statusFilter === 'draft') filtered = filtered.filter(ev => ev.published !== 'true');
+
+  if (!filtered.length) { el.innerHTML = '<p class="empty-hint">Ni dogodkov, ki bi ustrezali iskanju/filtru.</p>'; return; }
+
+  el.innerHTML = filtered.map(ev => `
     <div class="event-row">
       ${ev.imageUrl ? `<img class="thumb" src="${escapeHtml(ev.imageUrl)}" onerror="this.outerHTML='<div class=&quot;thumb&quot;>☽</div>'">` : '<div class="thumb">☽</div>'}
       <div class="info">
@@ -719,10 +951,25 @@ function renderEventsList(events) {
       <span class="status ${ev.published === 'true' ? 'pub' : 'draft'}">${ev.published === 'true' ? 'Objavljeno' : 'Osnutek'}</span>
       <div class="row-actions">
         <button class="icon-btn" title="Uredi" onclick="editEventById('${ev.id}')">✎</button>
+        <button class="icon-btn" title="Podvoji" onclick="duplicateEventById('${ev.id}')">⧉</button>
+        ${userRole !== 'editor' ? `<button class="icon-btn" title="Pošlji vabilo naročnikom" onclick="sendInviteForEvent('${ev.id}', this)">📧</button>` : ''}
         <button class="icon-btn del" title="Izbriši" onclick="deleteEvent('${ev.id}')">✕</button>
       </div>
     </div>
   `).join('');
+}
+
+// Prefills the event form from an existing event, minus its id/date — a
+// duplicate is meant to be a starting point for a similar future event, not
+// an accidental second copy of the same one, so we deliberately don't carry
+// over the id (forces "create new" on save) or the date (easy to forget to
+// change, and a stale copied date is a worse default than an empty one).
+function duplicateEventById(id) {
+  const ev = currentEventsList.find(e => e.id === id);
+  if (!ev) return;
+  const copy = { ...ev, id: '', date: '', title: `${ev.title} (kopija)`, published: 'false' };
+  editEvent(copy);
+  showToast('Podatki prekopirani — nastavi nov datum in shrani kot nov dogodek.');
 }
 
 function toggleLocationLabel() {
@@ -851,10 +1098,10 @@ function initTagPickers() {
   const themesEl = document.getElementById('ev-tag-themes');
   if (!typesEl || !themesEl) return;
   typesEl.innerHTML = EVENT_TAGS.types.map(t =>
-    `<button type="button" class="admin-tag-pill" data-id="${t.id}" onclick="toggleTagType('${t.id}')">${t.label}</button>`
+    `<button type="button" class="admin-tag-pill${t.id === currentTagType ? ' selected-type' : ''}" data-id="${escapeHtml(t.id)}" onclick="toggleTagType('${t.id}')">${escapeHtml(t.label)}</button>`
   ).join('');
   themesEl.innerHTML = EVENT_TAGS.themes.map(t =>
-    `<button type="button" class="admin-tag-pill" data-id="${t.id}" onclick="toggleTagTheme('${t.id}')">${t.label}</button>`
+    `<button type="button" class="admin-tag-pill${currentTagThemes.has(t.id) ? ' selected-theme' : ''}" data-id="${escapeHtml(t.id)}" onclick="toggleTagTheme('${t.id}')">${escapeHtml(t.label)}</button>`
   ).join('');
 }
 
@@ -939,30 +1186,79 @@ function renderSpeakerRows() {
       <div class="row" style="margin-bottom:0.5rem">
         <div class="field">
           <label style="font-size:0.78rem">Ime *</label>
-          <input type="text" class="sp-name" placeholder="Ime predavatelja" value="${s.name || ''}" required>
+          <input type="text" class="sp-name" list="known-speakers-list" placeholder="Ime predavatelja" value="${escapeHtml(s.name || '')}" required oninput="handleSpeakerNameInput(this)">
         </div>
         <div class="field">
           <label style="font-size:0.78rem">Vloga</label>
-          <input type="text" class="sp-role" placeholder="npr. Šamanka" value="${s.role || ''}">
+          <input type="text" class="sp-role" placeholder="npr. Šamanka" value="${escapeHtml(s.role || '')}">
         </div>
       </div>
       <div class="field" style="margin-bottom:0.5rem">
         <label style="font-size:0.78rem">Kratka predstavitev</label>
-        <textarea class="sp-bio" style="min-height:50px">${s.bio || ''}</textarea>
+        <textarea class="sp-bio" style="min-height:50px">${escapeHtml(s.bio || '')}</textarea>
       </div>
       <div class="speaker-upload-row">
         <input type="file" class="sp-file" accept="image/jpeg,image/png,image/webp" onchange="handleSpeakerImageUpload(event, ${s._rid})">
         <span class="sp-status" id="sp-status-${s._rid}"></span>
       </div>
-      <input type="url" class="sp-image-url" placeholder="...ali URL slike" value="${s.imageUrl || ''}" style="width:100%; margin-bottom:0.4rem">
+      <input type="url" class="sp-image-url" placeholder="...ali URL slike" value="${escapeHtml(s.imageUrl || '')}" style="width:100%; margin-bottom:0.4rem">
       <div class="sp-preview" id="sp-preview-${s._rid}">
-        ${s.imageUrl ? `<img src="${s.imageUrl}" onerror="this.style.display='none'">` : ''}
+        ${s.imageUrl ? `<img src="${escapeHtml(s.imageUrl)}" onerror="this.style.display='none'">` : ''}
       </div>
       <div class="field" style="margin-top:0.4rem">
-        <input type="url" class="sp-link" placeholder="Spletna stran / link" value="${s.link || ''}">
+        <input type="url" class="sp-link" placeholder="Spletna stran / link" value="${escapeHtml(s.link || '')}">
       </div>
     </div>
   `).join('');
+}
+
+// ── SPEAKER AUTOSUGGEST (lightweight — no separate directory/storage) ─────
+// Builds the suggestion list fresh from every speaker that has ever been
+// entered across all loaded events (deduped by name). This is deliberately
+// NOT a real "speakers" entity with its own id/storage: selecting a name
+// just prefills this event's row from the most recent match, and editing it
+// here only affects this event. Good enough for "don't retype the same bio
+// for the 5th time"; if that stops being enough, this can grow into a real
+// directory later without losing any existing event data.
+function buildSpeakerDirectory() {
+  const map = new Map();
+  currentEventsList.forEach(ev => {
+    let speakers = [];
+    try {
+      const v = ev.speakers;
+      speakers = Array.isArray(v) ? v : (typeof v === 'string' && v ? JSON.parse(v) : []);
+    } catch {}
+    speakers.forEach(s => { if (s?.name?.trim()) map.set(s.name.trim().toLowerCase(), s); });
+  });
+  return [...map.values()];
+}
+
+function renderSpeakerDatalist() {
+  const dl = document.getElementById('known-speakers-list');
+  if (!dl) return;
+  dl.innerHTML = buildSpeakerDirectory().map(s => `<option value="${escapeHtml(s.name)}">`).join('');
+}
+
+function handleSpeakerNameInput(inputEl) {
+  const match = buildSpeakerDirectory().find(s => s.name.trim().toLowerCase() === inputEl.value.trim().toLowerCase());
+  if (!match) return;
+  const row = inputEl.closest('.speaker-row');
+  if (!row) return;
+  // Only fill in fields that are still empty — never overwrite something
+  // the admin already typed for this specific event.
+  const roleEl = row.querySelector('.sp-role');
+  const bioEl = row.querySelector('.sp-bio');
+  const linkEl = row.querySelector('.sp-link');
+  const imgEl = row.querySelector('.sp-image-url');
+  if (roleEl && !roleEl.value) roleEl.value = match.role || '';
+  if (bioEl && !bioEl.value) bioEl.value = match.bio || '';
+  if (linkEl && !linkEl.value) linkEl.value = match.link || '';
+  if (imgEl && !imgEl.value && match.imageUrl) {
+    imgEl.value = match.imageUrl;
+    const preview = document.getElementById(`sp-preview-${row.dataset.rid}`);
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(match.imageUrl)}" onerror="this.style.display='none'">`;
+  }
+  syncSpeakerRowsFromDOM();
 }
 
 async function handleSpeakerImageUpload(e, rid) {
@@ -1019,8 +1315,9 @@ function editEvent(ev) {
   } catch {}
   parsedSpeakers.forEach(s => addSpeakerRow(s));
   if (!parsedSpeakers.length) renderSpeakerRows();
-  document.getElementById('event-form-title').textContent = 'Uredi dogodek';
-  document.getElementById('ev-save-btn').textContent = 'Posodobi dogodek';
+  const isNew = !ev.id;
+  document.getElementById('event-form-title').textContent = isNew ? 'Nov dogodek (iz kopije)' : 'Uredi dogodek';
+  document.getElementById('ev-save-btn').textContent = isNew ? 'Shrani kot nov dogodek' : 'Posodobi dogodek';
   document.getElementById('ev-cancel-btn').style.display = 'inline-flex';
   toggleLocationLabel();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1089,6 +1386,10 @@ function updateHeroCounter(el) {
   counter.className = 'char-counter' + (len > max * 0.9 ? (len >= max ? ' error' : ' warn') : '');
 }
 
+function toggleAdminCard(headerEl) {
+  headerEl.closest('.card').classList.toggle('open');
+}
+
 /* ── MEMBER IMAGE UPLOAD ── */
 async function handleMemberImageUpload(e) {
   const file = e.target.files[0];
@@ -1097,6 +1398,9 @@ async function handleMemberImageUpload(e) {
 }
 
 /* ── SETTINGS ── */
+let currentEventTypes = [];
+let currentEventThemes = [];
+
 async function loadSettings() {
   try {
     const data = await apiCall('/admin/settings');
@@ -1111,6 +1415,15 @@ async function loadSettings() {
     document.getElementById('set-collectname').checked = s.collectName !== 'false';
     document.getElementById('set-footer').value = s.footerText || '';
     renderTeamList(members);
+    currentEventTypes = data.eventTypes || [];
+    currentEventThemes = data.eventThemes || [];
+    renderTagManageList('tag-types-list', currentEventTypes, 'type');
+    renderTagManageList('tag-themes-list', currentEventThemes, 'theme');
+    // The event-edit form's tag picker (initTagPickers, called once at page
+    // load with the _shared.js fallback list) needs to be rebuilt now that
+    // the real admin-managed list has arrived.
+    setEventTags(currentEventTypes, currentEventThemes);
+    initTagPickers();
   } catch (e) { showToast(e.message, true); }
 }
 
@@ -1133,6 +1446,68 @@ async function saveSettings() {
       })
     });
     showToast('Nastavitve shranjene.');
+  } catch (e) { showToast(e.message, true); }
+}
+
+/* ── OZNAKE (event types / themes) ── */
+function renderTagManageList(containerId, tags, scope) {
+  const el = document.getElementById(containerId);
+  if (!tags.length) { el.innerHTML = '<p class="empty-hint">Še ni oznak.</p>'; return; }
+  el.innerHTML = tags.map(t => `
+    <div class="tag-manage-row">
+      <span>${escapeHtml(t.label)} <span class="tag-id">(${escapeHtml(t.id)})</span></span>
+      <button class="icon-btn del" onclick="deleteTag('${scope}','${escapeHtml(t.id)}')" title="Izbriši">✕</button>
+    </div>
+  `).join('');
+}
+
+async function addTag(scope) {
+  const inputId = scope === 'type' ? 'new-tag-type-input' : 'new-tag-theme-input';
+  const input = document.getElementById(inputId);
+  const label = input.value.trim();
+  if (!label) return;
+  try {
+    const data = await apiCall('/admin/settings?action=add-tag', {
+      method: 'POST',
+      body: JSON.stringify({ scope, label })
+    });
+    currentEventTypes = data.eventTypes || currentEventTypes;
+    currentEventThemes = data.eventThemes || currentEventThemes;
+    renderTagManageList('tag-types-list', currentEventTypes, 'type');
+    renderTagManageList('tag-themes-list', currentEventThemes, 'theme');
+    setEventTags(currentEventTypes, currentEventThemes);
+    initTagPickers();
+    input.value = '';
+    showToast('Oznaka dodana.');
+  } catch (e) { showToast(e.message, true); }
+}
+
+// Counts how many currently-loaded events use a given tag id, so the delete
+// confirmation can warn with a specific, honest number instead of a generic
+// "are you sure?" — deleting a tag doesn't touch existing events, it just
+// means they'll show the raw id instead of a nice label from then on.
+function countTagUsage(scope, id) {
+  return currentEventsList.filter(ev => {
+    if (scope === 'type') return ev.tagType === id;
+    try { return JSON.parse(ev.tagThemes || '[]').includes(id); } catch { return false; }
+  }).length;
+}
+
+async function deleteTag(scope, id) {
+  const count = countTagUsage(scope, id);
+  const warning = count > 0
+    ? `Ta oznaka je uporabljena pri ${count} ${count === 1 ? 'dogodku' : 'dogodkih'}. Če jo izbrišeš, bodo ti dogodki namesto lepega imena prikazovali surov ID ("${id}"). Res želiš izbrisati oznako?`
+    : 'Izbrišem to oznako?';
+  if (!confirm(warning)) return;
+  try {
+    const data = await apiCall(`/admin/settings?action=delete-tag&scope=${scope}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    currentEventTypes = data.eventTypes || currentEventTypes;
+    currentEventThemes = data.eventThemes || currentEventThemes;
+    renderTagManageList('tag-types-list', currentEventTypes, 'type');
+    renderTagManageList('tag-themes-list', currentEventThemes, 'theme');
+    setEventTags(currentEventTypes, currentEventThemes);
+    initTagPickers();
+    showToast('Oznaka izbrisana.');
   } catch (e) { showToast(e.message, true); }
 }
 
@@ -1307,6 +1682,7 @@ async function loadSubscribers() {
   try {
     const data = await apiCall('/admin/subscribers');
     allSubscribers = data.subscribers || [];
+    document.getElementById('stat-subscribers').textContent = allSubscribers.length;
     renderSubscribersList(allSubscribers);
   } catch (e) {
     document.getElementById('subscribers-list').innerHTML = '<p class="empty-hint">Napaka pri nalaganju naročnikov.</p>';

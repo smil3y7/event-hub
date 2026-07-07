@@ -4,7 +4,7 @@
 import { kv } from './_kv.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { cors, verifyJWT, ok, err, getClientIp, checkRateLimit } from './_lib.js';
+import { cors, verifyJWT, ok, err, getClientIp, checkRateLimit, pipelineHgetall, logAudit } from './_lib.js';
 
 export default async function handler(req, res) {
   cors(res);
@@ -105,6 +105,7 @@ async function handleAddUser(req, res) {
   });
 
   await kv.sadd('users', username.toLowerCase());
+  await logAudit(caller.username, 'user.add', `${username.toLowerCase()} (${role})`);
 
   return ok(res, { username: username.toLowerCase(), role }, 201);
 }
@@ -149,13 +150,11 @@ async function handleListUsers(req, res) {
   if (caller.role !== 'master') return err(res, 'Forbidden', 403);
 
   const usernames = await kv.smembers('users');
-  const users = (await Promise.all(
-    (usernames || []).map(async u => {
-      const data = await kv.hgetall(`user:${u}`);
-      if (!data) return null;
-      return { username: u, role: String(data.role || ''), mustChangePassword: String(data.mustChangePassword) === 'true' ? 'true' : 'false' };
-    })
-  )).filter(Boolean);
+  const records = await pipelineHgetall((usernames || []).map(u => `user:${u}`));
+  const users = records.map((data, i) => {
+    if (!data) return null;
+    return { username: usernames[i], role: String(data.role || ''), mustChangePassword: String(data.mustChangePassword) === 'true' ? 'true' : 'false' };
+  }).filter(Boolean);
   return ok(res, { users });
 }
 
@@ -171,5 +170,6 @@ async function handleDeleteUser(req, res) {
   if (username === caller.username) return err(res, 'Cannot delete yourself');
   await kv.del(`user:${username}`);
   await kv.srem('users', username);
+  await logAudit(caller.username, 'user.delete', username);
   return ok(res, { deleted: username });
 }

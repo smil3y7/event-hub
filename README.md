@@ -8,22 +8,29 @@ Sistem za zbiranje e-mail naslovov z upravljanjem dogodkov. Statični frontend +
 index.html              javna stran (single/catalog/series prikaz, modal detajlov, sticky subscribe)
 admin.html               admin panel (login, CRUD dogodkov, naročniki, nastavitve, uporabniki)
 unsubscribe.html          self-service stran za odjavo od e-novic
+_theme.css                skupna barvna paleta ("oneiro-dark"), deljena med _shared.css in admin.html/unsubscribe.html
+_shared.css                javno-specifični stili (uvozi _theme.css + doda --radius/--font)
+_shared.js                  skupna JS logika za javne strani
 api/
-  _lib.js                 skupne pomožne funkcije (CORS, JWT verify, rate limiting, normalizeRecord)
+  _lib.js                 skupne pomožne funkcije (CORS, JWT verify, rate limiting, normalizeRecord, pipelineHgetall)
   _kv.js                   centraliziran Upstash Redis klient
   setup.js                 enkratni seed (zažene se ENKRAT po deployu)
   subscribe.js              POST – prijava (?action=subscribe, privzeto) in odjava (?action=unsubscribe)
                               (rate limited: 5/uro/IP prijava, 10/uro/IP odjava)
-  events.js                    GET – javni seznam dogodkov + nastavitve
+  events.js                    GET – javni seznam dogodkov + nastavitve + oznake
   auth.js                       vse auth + user-management akcije v eni funkciji, routirano po ?action=
                                   (login / change-password / add-user / me / set-name /
-                                   list-users / delete-user)
+                                   list-users / delete-user) — zadnji dve rezervirani za master
   admin/
-    events.js                     GET/POST/DELETE – CRUD dogodkov (JWT zaščiteno)
-    subscribers.js                  GET – seznam naročnikov (?format=csv za CSV izvoz)
-    settings.js                       GET/PUT – način prikaza, vsebina strani
-    upload-image.js                     POST – nalaganje slike dogodka (Vercel Blob)
-vercel.json              CORS headers
+    events.js                     GET/POST/DELETE – CRUD dogodkov (JWT zaščiteno, odprto tudi za editor)
+    subscribers.js                  GET – seznam naročnikov (?format=csv za CSV izvoz) — admin/master only
+    settings.js                       GET/PUT/POST/DELETE – nastavitve, ekipa, oznake
+                                        (PUT/oznake admin/master only; ekipa odprta tudi za editor)
+    upload-image.js                     POST – nalaganje slike dogodka (Vercel Blob, odprto tudi za editor)
+    audit.js                              GET – dnevnik dejanj (admin/master only, ?limit=)
+admin/
+  audit.html                ločena stran za pregled dnevnika dejanj (izven glavne admin navigacije)
+vercel.json              CORS headers, Content-Type za _theme.css/_shared.css/_shared.js
 package.json              odvisnosti: @upstash/redis, @vercel/blob, bcryptjs, jsonwebtoken
 ```
 
@@ -164,3 +171,62 @@ Celovit pregled kode je odkril in odpravil naslednje:
 - Prikaže se šele po ~400px scrolla (ne tekmuje s prvim vtisom ob prihodu na stran).
 - Privzeto strnjena v tanek trak čez celo širino; klik razširi v poln obrazec.
 - Po uspešni prijavi se trajno skrije za tega obiskovalca (`localStorage`), saj ni razloga vztrajno spraševati nekoga, ki je že naročen.
+
+### Dopolnitev 2 — popravek regresije + upravljanje oznak prek UI
+
+**Popravljena regresija:** prejšnja iteracija je preveč na široko uporabila `escapeHtml()` — poleg naslovov/imen (kjer je prav) je pokvarila tudi ročno vnesene `<a href>` povezave v opisih dogodkov, bio predavateljev/članov ekipe in kontakt polju. Escaping je zdaj odstranjen s teh "prostobesedilnih" polj (`description`, `bio`, `contact`), ostane pa na strukturiranih poljih (`title`, `name`, `role`, `location`), kjer HTML nikoli ni bil namenjen.
+
+**Nova funkcionalnost — oznake dogodkov prek UI (Nastavitve → Oznake dogodkov):**
+- Tipi dogodkov in teme niso več trdo kodirani v `_shared.js`, ampak shranjeni v `settings` (Redis) in urejani prek admina — dodajanje (ime → samodejni slug, npr. "Izventelesne izkušnje" → `izventelesne-izkusnje`, s podporo slovenskim šumnikom) in brisanje, brez dotikanja kode.
+- Brisanje oznake, ki jo še uporablja kak dogodek, sproži opozorilo s točnim številom prizadetih dogodkov (dogodki sami ostanejo nedotaknjeni — le prikaz pade nazaj na surov ID).
+- Vsa brisanja v adminu (dogodek, član ekipe, uporabnik, oznaka) imajo potrditveno okno — preverjeno, obstajala so že za prve tri, dodano za oznake.
+- Panel "Nastavitve" je razdeljen na 4 zložljive kartice (Način prikaza — privzeto odprt, Vsebina strani, Oznake dogodkov, Ekipa); besedilo v nogi premaknjeno takoj za hero besedilo.
+- Panel "Naročniki" ločuje administrativni del (checkbox za zbiranje imena, izvoz CSV, kopiranje e-mailov) od seznama naročnikov spodaj.
+
+### Dopolnitev 3 — poglobljen pregled + omejitev vloge editor
+
+**Najdeno in popravljeno pri samo-reviziji:**
+- `jsdom` je po nesreči ostal v `package.json` kot produkcijska odvisnost (ostanek testiranja) — odstranjeno.
+- `initTagPickers()` v adminu ni uporabljala `escapeHtml()` na imenu oznake — popravljeno.
+- Če je admin med urejanjem dogodka (z že izbranimi oznakami) dodal/izbrisal oznako v Nastavitvah, se je picker obnovil in izgubil vizualni prikaz "izbrano" (podatek je ostal pravilen, prikaz ne) — popravljeno, rebuild zdaj ohrani izbrano stanje.
+
+**Vloga `editor` zdaj dejansko omejena** (prej je bila v praksi enakovredna `admin`):
+- SME: CRUD dogodkov, upravljanje ekipe, nalaganje slik.
+- NE SME: spreminjati nastavitve strani, upravljati oznake (dodajanje/brisanje), dostopati do seznama naročnikov/CSV izvoza — vse to je zdaj na backendu vrnjeno kot 403 za `editor`, v adminu pa so ustrezni deli UI zanjo/zanj skriti (`settings-card-mode`, `settings-card-content`, `settings-card-tags`, `subscribers-tab-btn`).
+- Upravljanje uporabnikov (`add-user`/`list-users`/`delete-user`) ostaja rezervirano izključno za `master`.
+
+**Odprto in namerno pustljeno kot je (ni bug, je odločitev):**
+- Podvojene barvne CSS spremenljivke med `admin.html` in `_shared.css` (admin ima namenoma ločen CSS, ker javne strani nosijo veliko nepotrebnega za dashboard).
+- N+1 poizvedbe proti Upstashu (`Promise.all` + posamični `hgetall` na 4 mestih) — pri trenutnem obsegu neopazno, pri večji rasti bi kazalo preiti na `kv.pipeline()`.
+
+### Dopolnitev 5 — nove funkcionalnosti (6 faz)
+
+**Faza 1 — deep-link, deljenje, koledar** (`events.html`, `index.html`, `_shared.js`):
+- `events.html?id=<id>` samodejno odpre modal tega dogodka (deljiva povezava); `history.pushState` posodablja URL ob odpiranju/zapiranju, `popstate` podpira nazaj/naprej v brskalniku.
+- Gumb "Deli": `navigator.share()` na mobilnem, kopiranje povezave v odložišče na namizju.
+- Gumb "Dodaj v koledar": generira `.ics` datoteko (RFC5545, s pravilnim escapingom) ali odpre Google Calendar. Privzeto trajanje dogodka (če ni eksplicitno navedeno) je `DEFAULT_EVENT_DURATION_HOURS = 2` v `_shared.js` — spremeni na enem mestu.
+
+**Faza 2 — admin: iskanje/filter, podvoji dogodek** (`admin.html`):
+- Iskalno polje (naslov/lokacija) + filter po statusu (objavljeno/osnutek) nad seznamom dogodkov.
+- Gumb "Podvoji" prekopira dogodek (brez ID-ja in datuma, naslov dobi pripono "(kopija)", status ostane osnutek).
+
+**Faza 3 — samodejni predlogi za govorce** (`admin.html`):
+- Lahka rešitev brez novega imenika: predlogi (`<datalist>`) iz vseh govorcev, ki so bili kdaj vneseni v katerem koli dogodku, deduplicirani po imenu. Izbira predloga predizpolni vlogo/bio/sliko/link — a samo v prazna polja, nikoli ne prepiše že vnesenega za ta konkretni dogodek.
+
+**Faza 4 — Dashboard** (`admin.html`, nov privzeti zavihek "Pregled"):
+- Število objavljenih/osnutkov, naslednji objavljen dogodek s štetjem dni do njega (`formatCountdown()` — računa po koledarskih dneh, ne po surovih 24-urnih blokih, da "jutri ob 9h" ne pokaže napačno kot "danes"), skupno naročnikov (skrito za `editor`).
+
+**Faza 5 — dnevnik dejanj (audit log)**:
+- `logAudit(who, action, target)` v `_lib.js` — vsaka administratorska sprememba (dogodek, nastavitve, oznake, ekipa, uporabniki) doda vnos v Redis seznam, omejen na `AUDIT_LOG_MAX_ENTRIES = 500` (starejši se samodejno odstranijo).
+- Nov endpoint `api/admin/audit.js` (GET, admin/master only — dejanja `editor`-ja se beležijo, a jih sam ne vidi).
+- Ločena stran `/admin/audit.html` (izven glavne admin navigacije, dostopna prek povezave v vznožju "Pregled" kartice), plus kratek predogled zadnjih 5 vnosov na dashboardu.
+
+**Faza 6 — pošiljanje vabil (pripravljeno, čaka na API ključ)**:
+- `sendEmail(to, subject, html)` v `_lib.js` — izolirana funkcija za Resend; če `RESEND_API_KEY`/`RESEND_FROM_EMAIL` nista nastavljena v Vercel env spremenljivkah, vrne jasno sporočilo namesto skrivnostne napake. Zamenjava ponudnika kadarkoli v prihodnje = sprememba te ene funkcije.
+- Gumb "📧 Pošlji vabilo" pri vsakem dogodku (samo admin/master) pošlje e-mail vsem naročnikom (BCC, v paketih po `EMAIL_CHUNK_SIZE = 45` naslovov na klic).
+
+### Dopolnitev 4 — N+1 poizvedbe in CSS podvajanje
+
+**N+1 poizvedbe odpravljene:** dodan `pipelineHgetall()` v `_lib.js`, ki namesto N posamičnih HTTP klicev proti Upstashu (`Promise.all(ids.map(id => kv.hgetall(...)))`) uporabi en sam pipeline klic. Uporabljeno na vseh 4 mestih, kjer se je pojavljalo: `api/events.js`, `api/admin/events.js`, `api/admin/subscribers.js`, `api/auth.js` (seznam uporabnikov).
+
+**CSS podvajanje odpravljeno:** nova skupna datoteka `_theme.css` z osnovno barvno paleto ("oneiro-dark"), ki jo zdaj uvozita `_shared.css` (javne strani) in neposredno povežeta `admin.html` ter `unsubscribe.html` (ki je imela isto podvajanje, a ni bila prej omenjena). Vsaka datoteka obdrži le svoje specifične vrednosti kot lokalen override (`--radius`/`--font` za javne strani, `--danger`/`--radius` za admin, `--danger` za unsubscribe) — vizualno se ni spremenilo ničesar, paleta se zdaj le ne more več po nesreči razhajati med datotekami.

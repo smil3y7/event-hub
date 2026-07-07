@@ -100,6 +100,7 @@
 <script>
 const PREVIEW_LENGTH = 3; // max upcoming events on homepage
 let collectName = false;
+let allEventsMap = {}; // id → event, used by handleShareClick/downloadICS (shared functions from _shared.js)
 
 // GLOBE_ICON and speakerListHtml() now come from /_shared.js — shared with events.html.
 
@@ -131,6 +132,7 @@ function eventHtml(ev, idx) {
   const words = (ev.description || '').split(/\s+/);
   const isLong = words.length > previewWords;
   const preview = words.slice(0, previewWords).join(' ') + (isLong ? '…' : '');
+  const gcalUrl = googleCalendarUrl(ev);
 
   return `
     <div class="event-single" data-event-theme="${ev.colorTag || 'oneiro-dark'}">
@@ -147,6 +149,17 @@ function eventHtml(ev, idx) {
           <span class="btn-label">Preberi več</span><span class="chevron">▾</span>
         </button>` : `<p class="desc-preview">${ev.description || ''}</p>`}
       ${ev.locationUrl ? `<a class="location-link" href="${escapeHtml(ev.locationUrl)}" target="_blank" rel="noopener">↗ ${ev.isOnline === 'true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
+      <div class="modal-action-row">
+        <button class="modal-action-btn" onclick="handleShareClick('${ev.id}', this)">↗ Deli</button>
+        ${gcalUrl ? `
+          <div class="modal-cal-dropdown">
+            <button class="modal-action-btn" onclick="toggleCalMenu(this)">🗓 Dodaj v koledar</button>
+            <div class="modal-cal-menu">
+              <a href="${gcalUrl}" target="_blank" rel="noopener">Google Calendar</a>
+              <button type="button" onclick="downloadICS(allEventsMap['${ev.id}']); toggleCalMenu(this, true)">Prenesi .ics (Outlook/Apple)</button>
+            </div>
+          </div>` : ''}
+      </div>
       ${speakerListHtml(speakers)}
     </div>`;
 }
@@ -154,7 +167,8 @@ function eventHtml(ev, idx) {
 async function init() {
   try {
     const data = await fetchPublicData();
-    const { events = [], settings = {}, teamMembers = [] } = data;
+    const { events = [], settings = {}, teamMembers = [], eventTypes = [], eventThemes = [] } = data;
+    setEventTags(eventTypes, eventThemes);
 
     // Apply settings
     const title = settings.siteTitle || 'Events';
@@ -183,6 +197,7 @@ async function init() {
       .slice(0, PREVIEW_LENGTH);
 
     const totalUpcoming = events.filter(e => e.published === 'true' && isUpcoming(e.date)).length;
+    upcoming.forEach(ev => { allEventsMap[ev.id] = ev; });
 
     // Remove skeleton
     document.getElementById('skeleton-wrap')?.remove();

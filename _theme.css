@@ -1,0 +1,15 @@
+/* _theme.css — shared "oneiro-dark" base palette.
+   Used by both the public pages (via _shared.css) and the admin dashboard
+   (admin.html links this directly). Previously these values were hand-copied
+   in both places and had already drifted (--radius: 14px vs 12px) — keeping
+   the shared subset here means the palette can only diverge on purpose (an
+   explicit override written after this import), never by accident.
+   Values that differ intentionally between admin and public (--radius,
+   --font, --danger) are NOT here — they stay as local overrides in each file. */
+:root {
+  --bg: #0a0a12; --bg2: #10101e; --bg3: #16162a;
+  --card: #1a1a2e; --border: rgba(120,100,255,0.18);
+  --accent: #7c6dfa; --accent2: #c4a44a;
+  --text: #e8e4ff; --text2: #9d97c8; --text3: #5e5a8a;
+  --sans: system-ui, -apple-system, sans-serif;
+}

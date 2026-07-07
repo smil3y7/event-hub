@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dnevnik dejanj — Admin</title>
+<link rel="stylesheet" href="/_theme.css">
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root { --radius: 12px; }
+* , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--sans); }
+.wrap { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.6rem; }
+h1 { font-size: 1.3rem; font-weight: 500; }
+a.back-link { color: var(--text2); font-size: 0.85rem; text-decoration: none; }
+a.back-link:hover { color: var(--accent); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem 1.5rem; }
+.entry { padding: 0.7rem 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.entry:last-child { border-bottom: none; }
+.entry .who { color: var(--accent2); font-weight: 500; }
+.entry .action { color: var(--text2); }
+.entry .target { color: var(--text); }
+.entry .when { color: var(--text3); font-size: 0.78rem; white-space: nowrap; }
+.empty-hint { color: var(--text3); font-size: 0.88rem; padding: 1rem 0; }
+.load-more-btn {
+  display: block; margin: 1.2rem auto 0; background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); font-family: var(--sans); font-size: 0.85rem; padding: 0.6rem 1.2rem;
+  border-radius: 8px; cursor: pointer;
+}
+.load-more-btn:hover { border-color: var(--accent); color: var(--text); }
+.gate { display: flex; align-items: center; justify-content: center; min-height: 60vh; color: var(--text3); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Dnevnik dejanj</h1>
+    <a class="back-link" href="/admin.html">← Nazaj v admin</a>
+  </header>
+  <div class="card" id="content">
+    <div class="gate">Preverjam dostop...</div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+const token = localStorage.getItem('ev_token');
+let limit = 50;
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+const ACTION_LABELS = {
+  'event.create': 'je ustvaril/a dogodek',
+  'event.update': 'je posodobil/a dogodek',
+  'event.delete': 'je izbrisal/a dogodek',
+  'settings.update': 'je spremenil/a nastavitve',
+  'tag.add': 'je dodal/a oznako',
+  'tag.delete': 'je izbrisal/a oznako',
+  'member.add': 'je dodal/a člana ekipe',
+  'member.update': 'je posodobil/a člana ekipe',
+  'member.delete': 'je izbrisal/a člana ekipe',
+  'user.add': 'je dodal/a uporabnika',
+  'user.delete': 'je izbrisal/a uporabnika'
+};
+
+function formatWhen(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('sl-SI', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  } catch { return iso || ''; }
+}
+
+async function loadAudit() {
+  const el = document.getElementById('content');
+  try {
+    const res = await fetch(`${API}/admin/audit?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.status === 401 || res.status === 403) {
+      el.innerHTML = '<div class="gate">Nimaš dostopa do te strani.</div>';
+      return;
+    }
+    const data = await res.json();
+    if (!data.ok) { el.innerHTML = `<div class="gate">${escapeHtml(data.error || 'Napaka.')}</div>`; return; }
+
+    if (!data.entries.length) {
+      el.innerHTML = '<p class="empty-hint">Dnevnik je prazen — še ni bilo zabeleženih dejanj.</p>';
+      return;
+    }
+
+    el.innerHTML = data.entries.map(e => `
+      <div class="entry">
+        <div>
+          <span class="who">${escapeHtml(e.who || 'neznano')}</span>
+          <span class="action">${escapeHtml(ACTION_LABELS[e.action] || e.action)}</span>
+          <span class="target">${escapeHtml(e.target || '')}</span>
+        </div>
+        <span class="when">${formatWhen(e.at)}</span>
+      </div>
+    `).join('') + (data.entries.length >= limit ? '<button class="load-more-btn" onclick="loadMore()">Naloži več</button>' : '');
+  } catch {
+    el.innerHTML = '<div class="gate">Napaka pri nalaganju.</div>';
+  }
+}
+
+function loadMore() { limit += 50; loadAudit(); }
+
+if (!token) {
+  document.getElementById('content').innerHTML = '<div class="gate">Nisi prijavljen/a. <a href="/admin.html" style="color:var(--accent)">Pojdi na prijavo →</a></div>';
+} else {
+  loadAudit();
+}
+</script>
+</body>
+</html>

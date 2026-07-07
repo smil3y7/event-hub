@@ -1,12 +1,12 @@
 // api/events.js — public endpoint
 import { kv } from './_kv.js';
-import { cors, ok, err, normalizeRecord, safeParseJsonArray } from './_lib.js';
+import { cors, ok, err, normalizeRecord, safeParseJsonArray, pipelineHgetall, DEFAULT_EVENT_TYPES, DEFAULT_EVENT_THEMES } from './_lib.js';
 
 // JSON array fields that Upstash deserializes — re-stringify them.
 // Kept in one place (this array) and reused for both events and settings so
 // this list can never drift out of sync with api/admin/events.js again.
 const EVENT_JSON_FIELDS = ['speakers', 'tagThemes'];
-const SETTINGS_JSON_FIELDS = ['teamMembers'];
+const SETTINGS_JSON_FIELDS = ['teamMembers', 'eventTypes', 'eventThemes'];
 
 export default async function handler(req, res) {
   cors(res);
@@ -23,18 +23,21 @@ export default async function handler(req, res) {
   const ids = await kv.smembers('events');
   const settings = await getSettings(kv);
   const teamMembers = safeParseJsonArray(settings?.teamMembers);
+  const eventTypesList = safeParseJsonArray(settings?.eventTypes);
+  const eventThemesList = safeParseJsonArray(settings?.eventThemes);
+  const eventTypes = eventTypesList.length ? eventTypesList : DEFAULT_EVENT_TYPES;
+  const eventThemes = eventThemesList.length ? eventThemesList : DEFAULT_EVENT_THEMES;
 
-  if (!ids || ids.length === 0) return ok(res, { events: [], settings, teamMembers });
+  if (!ids || ids.length === 0) return ok(res, { events: [], settings, teamMembers, eventTypes, eventThemes });
 
-  const events = (await Promise.all(
-    ids.map(id => kv.hgetall(`event:${id}`))
-  )).filter(Boolean).map(r => normalizeRecord(r, EVENT_JSON_FIELDS)).sort((a, b) => {
-    const da = a.date || a.createdAt || '';
-    const db = b.date || b.createdAt || '';
-    return da.localeCompare(db);
-  });
+  const events = (await pipelineHgetall(ids.map(id => `event:${id}`)))
+    .filter(Boolean).map(r => normalizeRecord(r, EVENT_JSON_FIELDS)).sort((a, b) => {
+      const da = a.date || a.createdAt || '';
+      const db = b.date || b.createdAt || '';
+      return da.localeCompare(db);
+    });
 
-  return ok(res, { events, settings, teamMembers });
+  return ok(res, { events, settings, teamMembers, eventTypes, eventThemes });
 }
 
 async function getSettings(kv) {
@@ -45,6 +48,8 @@ async function getSettings(kv) {
     siteSubtitle: '',
     collectName: 'true',
     heroText: '',
-    teamMembers: '[]'
+    teamMembers: '[]',
+    eventTypes: '[]',
+    eventThemes: '[]'
   };
 }

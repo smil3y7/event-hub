@@ -13,6 +13,10 @@
       "headers": [{ "key": "Content-Type", "value": "text/css" }]
     },
     {
+      "source": "/_theme.css",
+      "headers": [{ "key": "Content-Type", "value": "text/css" }]
+    },
+    {
       "source": "/_shared.js",
       "headers": [{ "key": "Content-Type", "value": "application/javascript" }]
     }

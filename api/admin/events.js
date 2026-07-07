@@ -1,6 +1,6 @@
 // api/admin/events.js
 import { kv } from '../_kv.js';
-import { cors, verifyJWT, ok, err, normalizeRecord, safeParseJsonArray } from '../_lib.js';
+import { cors, verifyJWT, ok, err, normalizeRecord, safeParseJsonArray, pipelineHgetall, logAudit } from '../_lib.js';
 import { randomUUID } from 'crypto';
 
 // Kept in sync with api/events.js — both files normalize the same hash shape.
@@ -10,12 +10,13 @@ export default async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  try { verifyJWT(req); } catch { return err(res, 'Unauthorized', 401); }
+  let caller;
+  try { caller = verifyJWT(req); } catch { return err(res, 'Unauthorized', 401); }
 
   if (req.method === 'GET') {
     const ids = await kv.smembers('events');
     if (!ids || ids.length === 0) return ok(res, { events: [] });
-    const events = (await Promise.all(ids.map(id => kv.hgetall(`event:${id}`))))
+    const events = (await pipelineHgetall(ids.map(id => `event:${id}`)))
       .filter(Boolean).map(r => normalizeRecord(r, EVENT_JSON_FIELDS));
     events.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     return ok(res, { events });
@@ -72,14 +73,17 @@ export default async function handler(req, res) {
 
     await kv.hset(`event:${eventId}`, fields);
     if (!isUpdate) await kv.sadd('events', eventId);
+    await logAudit(caller.username, isUpdate ? 'event.update' : 'event.create', title.trim());
     return ok(res, { id: eventId }, isUpdate ? 200 : 201);
   }
 
   if (req.method === 'DELETE') {
     const { id } = req.query;
     if (!id) return err(res, 'Missing id');
+    const existing = await kv.hgetall(`event:${id}`);
     await kv.del(`event:${id}`);
     await kv.srem('events', id);
+    await logAudit(caller.username, 'event.delete', existing?.title || id);
     return ok(res, { deleted: id });
   }
 

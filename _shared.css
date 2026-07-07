@@ -1,14 +1,10 @@
 /* _shared.css — shared styles for index.html, events.html, team.html */
 
+@import url('/_theme.css');
 /* ── CSS VARIABLES / THEMES ── */
 :root {
-  --bg: #0a0a12; --bg2: #10101e; --bg3: #16162a;
-  --card: #1a1a2e; --border: rgba(120,100,255,0.18);
-  --accent: #7c6dfa; --accent2: #c4a44a;
-  --text: #e8e4ff; --text2: #9d97c8; --text3: #5e5a8a;
   --radius: 14px;
   --font: 'Georgia', 'Times New Roman', serif;
-  --sans: system-ui, -apple-system, sans-serif;
 }
 [data-theme="forest-dream"], [data-event-theme="forest-dream"] {
   --bg: #080e0a; --bg2: #0d1510; --bg3: #111d14;
@@ -514,6 +510,27 @@ body::before {
   text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s;
 }
 .location-link:hover { border-color: var(--accent); }
+
+/* ── MODAL ACTIONS (share / add to calendar) ── */
+.modal-action-row { display: flex; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; }
+.modal-action-btn {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+  font-family: var(--sans); font-size: 0.82rem; padding: 0.5rem 0.9rem; border-radius: 8px;
+  cursor: pointer; transition: border-color 0.2s, color 0.2s;
+}
+.modal-action-btn:hover { border-color: var(--accent); color: var(--text); }
+.modal-cal-dropdown { position: relative; }
+.modal-cal-menu {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  min-width: 200px; padding: 0.4rem; flex-direction: column; gap: 0.2rem;
+}
+.modal-cal-dropdown.open .modal-cal-menu { display: flex; }
+.modal-cal-menu a, .modal-cal-menu button {
+  background: none; border: none; text-align: left; color: var(--text2); font-family: var(--sans);
+  font-size: 0.82rem; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; text-decoration: none;
+}
+.modal-cal-menu a:hover, .modal-cal-menu button:hover { background: var(--bg3); color: var(--text); }
 
 /* ── TIMELINE (series) ── */
 .timeline { max-width: 720px; margin: 2.5rem auto; padding: 0 1.5rem; position: relative; }

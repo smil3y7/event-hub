@@ -11,7 +11,11 @@ const API = '/api';
 const OG_IMAGE_URL = '/og-image.svg';
 
 // ── TAGS (edit to match your event taxonomy) ──────────────────────────────
-const EVENT_TAGS = {
+// EVENT_TAGS is now admin-editable (see "Oznake" section in admin.html) and
+// stored server-side in settings.eventTypes/eventThemes. This is only the
+// fallback used before the first API response arrives (or if it's ever
+// empty) — setEventTags() below replaces it with the real, current list.
+let EVENT_TAGS = {
   types: [
     { id: 'delavnica', label: 'Delavnica' },
     { id: 'predavanje', label: 'Predavanje' },
@@ -33,6 +37,13 @@ const EVENT_TAGS = {
     { id: 'drugo', label: 'Drugo' }
   ]
 };
+// Called by each public page once /api/events resolves, with the current
+// admin-managed tag list. Falls back to keeping the defaults above if the
+// API didn't send any (e.g. a very old cached response shape).
+function setEventTags(types, themes) {
+  if (Array.isArray(types) && types.length) EVENT_TAGS.types = types;
+  if (Array.isArray(themes) && themes.length) EVENT_TAGS.themes = themes;
+}
 
 // ── HTML ESCAPING ─────────────────────────────────────────────────────────
 // All event/speaker/team-member text fields are plain text (never meant to
@@ -255,6 +266,117 @@ async function handleSubscribe(e) {
   }
 }
 
+// ── CALENDAR EXPORT (.ics + Google Calendar) ──────────────────────────────
+// The event model only stores a start date/time, not a duration — most
+// small events don't bother filling in an end time. This default is used
+// only when generating calendar entries; change it here if 2h stops being
+// a reasonable guess for your events.
+const DEFAULT_EVENT_DURATION_HOURS = 2;
+
+function icsEscape(str) {
+  return String(str || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+function stripHtml(str) {
+  return String(str || '').replace(/<[^>]+>/g, '');
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+// Returns { start, end } as ICS-format floating local time strings (no
+// timezone conversion — fine for a single-timezone Slovenian audience).
+function eventTimeRange(ev) {
+  if (!ev.date) return null;
+  const time = ev.time || '00:00';
+  const startDate = new Date(`${ev.date}T${time}:00`);
+  if (isNaN(startDate.getTime())) return null;
+  const endDate = new Date(startDate.getTime() + DEFAULT_EVENT_DURATION_HOURS * 3600 * 1000);
+  const fmt = d => `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
+  return { start: fmt(startDate), end: fmt(endDate) };
+}
+
+function generateICS(ev) {
+  const range = eventTimeRange(ev);
+  if (!range) return null;
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad2(now.getUTCMonth() + 1)}${pad2(now.getUTCDate())}T${pad2(now.getUTCHours())}${pad2(now.getUTCMinutes())}${pad2(now.getUTCSeconds())}Z`;
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Event Hub//SL', 'BEGIN:VEVENT',
+    `UID:${ev.id}@eventhub`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${range.start}`,
+    `DTEND:${range.end}`,
+    `SUMMARY:${icsEscape(ev.title)}`,
+    ev.description ? `DESCRIPTION:${icsEscape(stripHtml(ev.description))}` : '',
+    ev.location ? `LOCATION:${icsEscape(ev.location)}` : '',
+    'END:VEVENT', 'END:VCALENDAR'
+  ].filter(Boolean);
+  return lines.join('\r\n');
+}
+
+function downloadICS(ev) {
+  const content = generateICS(ev);
+  if (!content) return;
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(ev.title || 'dogodek').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function googleCalendarUrl(ev) {
+  const range = eventTimeRange(ev);
+  if (!range) return null;
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: ev.title || '',
+    dates: `${range.start}/${range.end}`,
+    details: stripHtml(ev.description || '').substring(0, 900),
+    location: ev.location || ''
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// Native share sheet on mobile; clipboard copy fallback on desktop.
+// Returns 'shared' | 'copied' | 'failed' so the caller can decide whether to
+// show a toast (native share already has its own UI, so no toast needed then).
+async function shareEvent(ev, url) {
+  const shareData = { title: ev.title || '', text: stripHtml(ev.description || '').substring(0, 150), url };
+  if (navigator.share) {
+    try { await navigator.share(shareData); return 'shared'; }
+    catch { return 'failed'; } // user cancelled — not an error worth surfacing
+  }
+  try { await navigator.clipboard.writeText(url); return 'copied'; }
+  catch { return 'failed'; }
+}
+// Shared by index.html and events.html — both maintain their own
+// `allEventsMap` (id → event) global, populated in their init(). Looking up
+// by id here (rather than passing the whole event object into onclick)
+// avoids the JSON.stringify-in-onclick-attribute trap that broke on quotes
+// elsewhere in this app.
+async function handleShareClick(id, btn) {
+  const ev = (typeof allEventsMap !== 'undefined') && allEventsMap[id];
+  if (!ev) return;
+  const url = `${window.location.origin}/events?id=${encodeURIComponent(id)}`;
+  const result = await shareEvent(ev, url);
+  if (result === 'copied') {
+    const original = btn.textContent;
+    btn.textContent = '✓ Povezava kopirana';
+    setTimeout(() => { btn.textContent = original; }, 2000);
+  }
+}
+
+function toggleCalMenu(btn, forceClose) {
+  const wrap = btn.closest('.modal-cal-dropdown');
+  wrap.classList.toggle('open', forceClose ? false : !wrap.classList.contains('open'));
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.modal-cal-dropdown')) {
+    document.querySelectorAll('.modal-cal-dropdown.open').forEach(el => el.classList.remove('open'));
+  }
+});
 // ── BACK TO TOP ───────────────────────────────────────────────────────────
 function initBackToTop() {
   const btn = document.getElementById('back-to-top');
