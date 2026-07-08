@@ -109,8 +109,10 @@ function toggleDesc(btn, previewId, fullId) {
   const preview = document.getElementById(previewId);
   const full = document.getElementById(fullId);
   btn.classList.toggle('open', !isOpen);
-  btn.querySelector('.chevron').textContent = isOpen ? '▾' : '▴';
-  btn.querySelector('.btn-label').textContent = isOpen ? 'Preberi več' : 'Skrij';
+  const chevron = btn.querySelector('.chevron');
+  if (chevron) chevron.textContent = isOpen ? '▾' : '▴';
+  const lbl = btn.querySelector('.btn-label');
+  if (lbl) lbl.textContent = isOpen ? 'Prikaži več' : 'Skrij';
   preview.style.display = isOpen ? '' : 'none';
   full.classList.toggle('open', !isOpen);
 }
@@ -132,7 +134,8 @@ function eventHtml(ev, idx) {
   const words = (ev.description || '').split(/\s+/);
   const isLong = words.length > previewWords;
   const preview = words.slice(0, previewWords).join(' ') + (isLong ? '…' : '');
-  const gcalUrl = googleCalendarUrl(ev);
+  const isPastEvent = !isUpcoming(ev.date);
+  const gcalUrl = isPastEvent ? null : googleCalendarUrl(ev);
 
   return `
     <div class="event-single" data-event-theme="${ev.colorTag || 'oneiro-dark'}">
@@ -140,27 +143,22 @@ function eventHtml(ev, idx) {
       <div class="event-meta">${eventBadges(ev)}</div>
       ${tags.length ? `<div class="tag-pills-row">${renderTagPills(tags)}</div>` : ''}
       <h2>${escapeHtml(ev.title)}</h2>
-      ${isLong ? `
-        <p class="desc-preview" id="${descId}">${preview}</p>
-        <div class="collapsible-body" id="${descFull}">
-          <p class="desc-full">${ev.description}</p>
-        </div>
-        <button class="collapsible-trigger" onclick="toggleDesc(this,'${descId}','${descFull}')">
-          <span class="btn-label">Preberi več</span><span class="chevron">▾</span>
-        </button>` : `<p class="desc-preview">${ev.description || ''}</p>`}
-      ${ev.locationUrl ? `<a class="location-link" href="${escapeHtml(ev.locationUrl)}" target="_blank" rel="noopener">↗ ${ev.isOnline === 'true' ? 'Pridruži se online' : 'Odpri lokacijo'}</a>` : ''}
+      <p class="desc-preview" id="${descId}">${isLong ? preview : (ev.description || '')}</p>
+      ${isLong ? `<div class="collapsible-body" id="${descFull}"><p class="desc-full">${ev.description}</p></div>` : ''}
+      ${speakerListHtml(speakers)}
       <div class="modal-action-row">
+        ${isLong ? `<button class="modal-action-btn" onclick="toggleDesc(this,'${descId}','${descFull}')"><span class="btn-label">Prikaži več</span></button>` : ''}
+        ${ev.locationUrl ? `<a class="modal-action-btn" href="${escapeHtml(ev.locationUrl)}" target="_blank" rel="noopener">${ev.isOnline === 'true' ? 'Pridruži se' : 'Odpri lokacijo'}</a>` : ''}
         <button class="modal-action-btn" onclick="handleShareClick('${ev.id}', this)">↗ Deli</button>
         ${gcalUrl ? `
           <div class="modal-cal-dropdown">
-            <button class="modal-action-btn" onclick="toggleCalMenu(this)">🗓 Dodaj v koledar</button>
+            <button class="modal-action-btn" onclick="toggleCalMenu(this)">🗓 Koledar</button>
             <div class="modal-cal-menu">
               <a href="${gcalUrl}" target="_blank" rel="noopener">Google Calendar</a>
               <button type="button" onclick="downloadICS(allEventsMap['${ev.id}']); toggleCalMenu(this, true)">Prenesi .ics (Outlook/Apple)</button>
             </div>
           </div>` : ''}
       </div>
-      ${speakerListHtml(speakers)}
     </div>`;
 }
 

@@ -20,6 +20,20 @@ const csvEscape = v => {
 // silently fail the whole invite in one go.
 const EMAIL_CHUNK_SIZE = 45;
 
+// Strips embedded HTML (e.g. intentional <a href> links admin put in the
+// description) before truncating — cutting raw HTML by character count risks
+// slicing through a tag and leaving broken/dangling markup in the email
+// (unlike the website, there's no way to "click through" a broken email to
+// see the fixed version). The event page linked at the bottom has the full
+// formatted description with any links intact.
+function truncateAtWord(text, maxLen) {
+  const plain = String(text || '').replace(/<[^>]+>/g, '');
+  if (plain.length <= maxLen) return plain;
+  const cut = plain.substring(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > maxLen * 0.6 ? cut.substring(0, lastSpace) : cut) + '…';
+}
+
 export default async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -42,13 +56,18 @@ export default async function handler(req, res) {
     const proto = req.headers['x-forwarded-proto'] || 'https';
     const eventUrl = `${proto}://${req.headers.host}/events?id=${encodeURIComponent(eventId)}`;
     const subject = `Vabilo: ${ev.title || 'Dogodek'}`;
-    const html = `
-      <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;color:#222">
-        <h2 style="font-weight:400">${escapeHtml(ev.title)}</h2>
-        <p style="color:#555;font-size:0.9rem">${escapeHtml(ev.date || '')}${ev.time ? ' · ' + escapeHtml(ev.time) : ''}${ev.location ? ' · ' + escapeHtml(ev.location) : ''}</p>
-        <p style="line-height:1.6">${(ev.description || '').substring(0, 600)}</p>
-        <p><a href="${eventUrl}" style="color:#7c6dfa">Več informacij in prijava →</a></p>
-      </div>`;
+    const description = truncateAtWord(ev.description || '', 900);
+    const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f2f0f9">
+  <div style="font-family:Georgia,'Times New Roman',serif;max-width:520px;margin:0 auto;padding:2.2rem 1.8rem;color:#2a2a35;background:#ffffff;border-radius:12px">
+    <h1 style="font-size:1.4rem;font-weight:400;margin:0 0 0.6rem;line-height:1.3">${escapeHtml(ev.title)}</h1>
+    <p style="color:#7c6dfa;font-size:0.85rem;font-family:Arial,sans-serif;margin:0 0 1.3rem">${escapeHtml(ev.date || '')}${ev.time ? ' · ' + escapeHtml(ev.time) : ''}${ev.location ? ' · ' + escapeHtml(ev.location) : ''}</p>
+    <p style="line-height:1.7;font-size:0.95rem;white-space:pre-line;margin:0 0 1.6rem">${escapeHtml(description)}</p>
+    <p style="margin:0">
+      <a href="${eventUrl}" style="display:inline-block;background:#7c6dfa;color:#ffffff;text-decoration:none;padding:0.7rem 1.5rem;border-radius:8px;font-family:Arial,sans-serif;font-size:0.9rem">Več informacij in prijava →</a>
+    </p>
+  </div>
+</body></html>`;
 
     // Dry run assembles the exact same subject/html/recipient list as a real
     // send, just without ever calling sendEmail() — lets the whole pipeline

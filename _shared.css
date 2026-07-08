@@ -504,12 +504,6 @@ body::before {
   margin-bottom: 1.25rem; color: var(--text);
 }
 .desc { font-size: 1.05rem; line-height: 1.75; color: var(--text2); white-space: pre-line; }
-.location-link {
-  display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 1.5rem;
-  color: var(--accent); font-family: var(--sans); font-size: 0.9rem;
-  text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s;
-}
-.location-link:hover { border-color: var(--accent); }
 
 /* ── MODAL ACTIONS (share / add to calendar) ── */
 .modal-action-row { display: flex; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; }
@@ -517,6 +511,7 @@ body::before {
   background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
   font-family: var(--sans); font-size: 0.82rem; padding: 0.5rem 0.9rem; border-radius: 8px;
   cursor: pointer; transition: border-color 0.2s, color 0.2s;
+  display: inline-flex; align-items: center; text-decoration: none;
 }
 .modal-action-btn:hover { border-color: var(--accent); color: var(--text); }
 .modal-cal-dropdown { position: relative; }

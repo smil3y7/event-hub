@@ -238,6 +238,18 @@ Celovit pregled kode je odkril in odpravil naslednje:
 - Vsi `confirm()` pozivi brskalnika (brisanje dogodka/člana/uporabnika/oznake, pošiljanje vabila) zamenjani z lastnim modalom (`showConfirmModal()`), skladnim z videzom strani.
 - Dashboard: namesto predogleda dnevnika dejanj zdaj prikazuje "Zadnji dodani dogodki" (zadnji 3, klik odpre urejanje), z diskretno (manj vpadljivo) povezavo na poln dnevnik dejanj spodaj namesto prejšnjega izpostavljenega seznama.
 
+### Dopolnitev 7 — oblikovanje e-pošte + reorganizacija modala dogodka
+
+**E-pošta za vabila** (`api/admin/subscribers.js`):
+- Opis dogodka je prej padel v en sam neoblikovan odstavek in se grdo odrezal pri 600 znakih. Zdaj: HTML iz opisa se najprej varno odstrani (da odrezovanje ne pusti poškodovane kode sredi značke — polna, oblikovana različica z morebitnimi povezavami je itak na strani dogodka), nato se odreže na meji besede z elipso (`truncateAtWord()`, meja zdaj 900 znakov), prelomi vrstic/odstavkov pa so ohranjeni (`white-space:pre-line`). E-pošta ima zdaj tudi vizualno ločeno "kartico" z gumbom v CTA slogu namesto golega besedila.
+- Modal za predogled v adminu je zdaj višji (`min(600px, 70vh)` namesto fiksnih 360px) in širši.
+
+**Modal dogodka** (`events.html`, `index.html`) — reorganiziran vrstni red glede na povratno informacijo:
+- Predavatelji so premaknjeni višje, takoj pod opis dogodka (prej so bili pod akcijskimi gumbi, kar je delovalo neumestno).
+- Spodaj je zdaj en sam, vizualno enoten niz gumbov v zaporedju: **Prikaži več** (razširi opis, samo če je opis dovolj dolg) → **Pridruži se / Odpri lokacijo** (samo če dogodek ima lokacijo) → **Deli** → **Koledar** (skrit pri preteklih dogodkih — dodajanje minulega dogodka v koledar ni smiselno).
+- `toggleCollapsible()`/`toggleDesc()` popravljena, da ne vržeta napake, če gumb nima chevron ikone (novi spodnji gumbi je nimajo, za enotnejši videz z ostalimi tremi).
+- Neuporabljen `.location-link` CSS razred odstranjen (nadomeščen z `.modal-action-btn`, ki zdaj deluje enako za `<button>` in `<a>` elemente).
+
 ### Dopolnitev 4 — N+1 poizvedbe in CSS podvajanje
 
 **N+1 poizvedbe odpravljene:** dodan `pipelineHgetall()` v `_lib.js`, ki namesto N posamičnih HTTP klicev proti Upstashu (`Promise.all(ids.map(id => kv.hgetall(...)))`) uporabi en sam pipeline klic. Uporabljeno na vseh 4 mestih, kjer se je pojavljalo: `api/events.js`, `api/admin/events.js`, `api/admin/subscribers.js`, `api/auth.js` (seznam uporabnikov).
