@@ -222,6 +222,17 @@ function setSubscribeBarNameField(collect) {
   document.getElementById('subscribe-bar')?.classList.toggle('show-name', !!collect);
 }
 
+// Called from empty-state CTAs (e.g. "no upcoming events, subscribe for
+// updates instead") — makes the (usually scroll-triggered) subscribe bar
+// appear immediately and pre-expands it, since the person came here through
+// an explicit ask to subscribe rather than organic scrolling.
+function revealAndExpandSubscribeBar() {
+  const bar = document.getElementById('subscribe-bar');
+  if (!bar) return; // already-subscribed visitors never get the bar created at all
+  bar.classList.add('visible');
+  expandSubscribeBar();
+}
+
 // ── SUBSCRIBE FORM ────────────────────────────────────────────────────────
 // Single implementation used by index.html, events.html and team.html.
 // Each page's sticky subscribe bar uses the same markup (.sub-email,

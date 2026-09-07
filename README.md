@@ -250,6 +250,16 @@ Celovit pregled kode je odkril in odpravil naslednje:
 - `toggleCollapsible()`/`toggleDesc()` popravljena, da ne vržeta napake, če gumb nima chevron ikone (novi spodnji gumbi je nimajo, za enotnejši videz z ostalimi tremi).
 - Neuporabljen `.location-link` CSS razred odstranjen (nadomeščen z `.modal-action-btn`, ki zdaj deluje enako za `<button>` in `<a>` elemente).
 
+### Dopolnitev 8 — pravi bug: pretekli dogodki nikoli vidni, če ni prihajajočih + CTA
+
+**Popravljen resen bug** (`events.html`): preklopnik "Prihajajoči"/"Pretekli" se je prikazal le, če so hkrati obstajali OBA tipa dogodkov (`hasPast && hasUpcoming`). Če je imela stran samo pretekle (ali samo prihajajoče) dogodke, preklopnik ni bil nikoli viden, `currentFilter` pa je ostal zataknjen na privzetem `'upcoming'` — stran je bila videti prazna, ne glede na katerikoli filter po oznakah (ki je bil nepovezan rdeč sled). Popravljeno:
+- Dodan nov privzeti zavihek **"Vsi"** (prikaže prihajajoče in pretekle skupaj), ki je zdaj privzeto aktiven.
+- Preklopnik je viden, če obstaja SPLOH kak objavljen dogodek (`hasPast || hasUpcoming`), ne le če obstajata oba tipa.
+- Dodan gumb "✕ Počisti filtre" (prej ni bilo načina za hkratno počistitev vseh aktivnih filtrov po oznakah).
+- Izboljšana vizualna razlika med izbrano/neizbrano oznako (izbrana zdaj poln obarvan "chip", ne le rahlo drugačna obroba/ozadje) — temske oznake so poleg tega dobile manjkajoč `theme` CSS razred, potreben za to razliko.
+
+**CTA za naročilo na obvestila** (`index.html`): če ni napovedanih prihodnjih dogodkov, prazno stanje zdaj poleg sporočila ponudi gumb "Naroči se na obvestila o novih dogodkih", ki takoj razkrije in razširi sticky prijavni obrazec (skrit, če je obiskovalec že naročen).
+
 ### Dopolnitev 4 — N+1 poizvedbe in CSS podvajanje
 
 **N+1 poizvedbe odpravljene:** dodan `pipelineHgetall()` v `_lib.js`, ki namesto N posamičnih HTTP klicev proti Upstashu (`Promise.all(ids.map(id => kv.hgetall(...)))`) uporabi en sam pipeline klic. Uporabljeno na vseh 4 mestih, kjer se je pojavljalo: `api/events.js`, `api/admin/events.js`, `api/admin/subscribers.js`, `api/auth.js` (seznam uporabnikov).

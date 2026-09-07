@@ -53,10 +53,11 @@
     <p id="site-subtitle"></p>
   </header>
 
-  <!-- Filter tabs: upcoming / past -->
+  <!-- Filter tabs: all / upcoming / past -->
   <div id="filter-tabs-wrap" style="display:none">
     <div class="filter-tabs" id="filter-tabs">
-      <button class="filter-tab active" data-filter="upcoming" onclick="setFilter('upcoming')">Prihajajoči</button>
+      <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">Vsi</button>
+      <button class="filter-tab" data-filter="upcoming" onclick="setFilter('upcoming')">Prihajajoči</button>
       <button class="filter-tab" data-filter="past" onclick="setFilter('past')">Pretekli</button>
     </div>
   </div>
@@ -68,6 +69,7 @@
     <div class="tag-filter-separator" style="margin:0 0.8rem"></div>
     <span class="label">Tema:</span>
     <div id="theme-filters" style="display:flex; flex-wrap:wrap; gap:0.4rem"></div>
+    <button type="button" id="clear-filters-btn" class="tag-pill clickable" style="display:none; margin-left:0.6rem" onclick="clearTagFilters()">✕ Počisti filtre</button>
   </div>
 
   <!-- Skeleton -->
@@ -96,7 +98,7 @@
 <script>
 const PAGE_SIZE = 6;
 let allEvents = [];
-let currentFilter = 'upcoming';
+let currentFilter = 'all';
 let activeTagType = null;
 let activeTagThemes = new Set();
 let visibleCount = PAGE_SIZE;
@@ -137,7 +139,7 @@ function buildTagFilters(events) {
 
   document.getElementById('theme-filters').innerHTML = [...usedThemes].map(id => {
     const lbl = EVENT_TAGS.themes.find(t => t.id === id)?.label || id;
-    return `<button class="tag-pill clickable" data-id="${id}" onclick="toggleThemeFilter('${id}')">${lbl}</button>`;
+    return `<button class="tag-pill clickable theme" data-id="${id}" onclick="toggleThemeFilter('${id}')">${lbl}</button>`;
   }).join('');
 }
 
@@ -147,6 +149,7 @@ function toggleTypeFilter(id) {
   document.querySelectorAll('#type-filters .tag-pill').forEach(el => {
     el.classList.toggle('active', el.dataset.id === activeTagType);
   });
+  updateClearFiltersBtn();
   renderMain();
 }
 
@@ -156,7 +159,22 @@ function toggleThemeFilter(id) {
   document.querySelectorAll('#theme-filters .tag-pill').forEach(el => {
     el.classList.toggle('active', activeTagThemes.has(el.dataset.id));
   });
+  updateClearFiltersBtn();
   renderMain();
+}
+
+function clearTagFilters() {
+  activeTagType = null;
+  activeTagThemes.clear();
+  visibleCount = PAGE_SIZE;
+  document.querySelectorAll('.tag-pill').forEach(el => el.classList.remove('active'));
+  updateClearFiltersBtn();
+  renderMain();
+}
+
+function updateClearFiltersBtn() {
+  const btn = document.getElementById('clear-filters-btn');
+  if (btn) btn.style.display = (activeTagType || activeTagThemes.size > 0) ? '' : 'none';
 }
 
 function filterByTag(id) {
@@ -346,7 +364,13 @@ async function init() {
     const published = events.filter(e => e.published === 'true');
     const hasPast = published.some(e => !isUpcoming(e.date));
     const hasUpcoming = published.some(e => isUpcoming(e.date));
-    if (hasPast && hasUpcoming) document.getElementById('filter-tabs-wrap').style.display = '';
+    // Previously this only showed the tab switcher when BOTH kinds existed —
+    // meaning if you only had past (or only upcoming) events, there was no
+    // way to switch to see them, since currentFilter stayed stuck on its
+    // default. Now it shows whenever there's at least one published event,
+    // and defaults to the "Vsi" tab so something always renders regardless
+    // of which kind you happen to have.
+    if (hasPast || hasUpcoming) document.getElementById('filter-tabs-wrap').style.display = '';
 
     buildTagFilters(published);
 
@@ -356,6 +380,7 @@ async function init() {
       const isType = EVENT_TAGS.types.some(t => t.id === urlTag);
       if (isType) { activeTagType = urlTag; document.querySelectorAll('#type-filters .tag-pill').forEach(el => el.classList.toggle('active', el.dataset.id === urlTag)); }
       else { activeTagThemes.add(urlTag); document.querySelectorAll('#theme-filters .tag-pill').forEach(el => el.classList.toggle('active', activeTagThemes.has(el.dataset.id))); }
+      updateClearFiltersBtn();
     }
 
     renderMain();

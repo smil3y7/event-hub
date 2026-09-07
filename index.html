@@ -202,7 +202,13 @@ async function init() {
 
     const main = document.getElementById('main');
     if (!upcoming.length) {
-      main.innerHTML = `<div class="empty-state"><div class="symbol">☽</div><p>Ni napovedanih prihodnjih dogodkov.</p></div>`;
+      const alreadySubscribed = localStorage.getItem('ev_subscribed') === 'true';
+      main.innerHTML = `
+        <div class="empty-state">
+          <div class="symbol">☽</div>
+          <p>Ni napovedanih prihodnjih dogodkov.</p>
+          ${alreadySubscribed ? '' : `<button class="btn-cta-subscribe" onclick="revealAndExpandSubscribeBar()">Naroči se na obvestila o novih dogodkih</button>`}
+        </div>`;
     } else {
       main.innerHTML = upcoming.map((ev, i) => eventHtml(ev, i)).join('');
     }
